@@ -1,0 +1,24 @@
+{
+  "name": "创维TV 分屏控制",
+  "short_name": "分屏控制",
+  "description": "控制创维电视端的分屏显示，支持多种布局和内容类型",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='64' fill='%2358a6ff'/%3E%3Ctext x='256' y='340' font-family='Arial' font-weight='bold' font-size='280' fill='%23000' text-anchor='middle'%3ETV%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='24' fill='%2358a6ff'/%3E%3Ctext x='96' y='130' font-family='Arial' font-weight='bold' font-size='105' fill='%23000' text-anchor='middle'%3ETV%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "name": "tv-control-desktop",
+  "version": "1.0.0",
+  "description": "创维TV投屏分屏 - 电脑控制端",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build-dir": "electron-builder --win dir"
+  },
+  "build": {
+    "appId": "com.splitscreen.control",
+    "productName": "TV分屏控制",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "assets/icon.png"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

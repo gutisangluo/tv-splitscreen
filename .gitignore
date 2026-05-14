@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+*/build/
+local.properties
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Node
+node_modules/
+dist/
+
+# Go
+*.exe
+
+# Temp
+*.log
+*.tmp

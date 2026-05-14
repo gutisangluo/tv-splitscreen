@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TV分屏</string>
+    <string name="channel_name">TV分屏服务</string>
+    <string name="channel_desc">保证分屏应用后台运行</string>
+    <string name="service_running">分屏服务运行中</string>
+    <string name="ws_connecting">正在连接控制端…</string>
+    <string name="ws_connected">已连接控制端</string>
+    <string name="ws_disconnected">控制端已断开</string>
+    <string name="no_content">无内容</string>
+</resources>

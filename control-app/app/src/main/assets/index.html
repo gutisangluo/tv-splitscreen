@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0d1117">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="创维TV 分屏控制端 - 远程控制电视分屏显示">
+  <link rel="manifest" href="manifest.json">
+  <title>创维TV 分屏控制</title>
+  <link rel="stylesheet" href="css/style.css">
+  <!-- No external dependencies -->
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<div class="app-container">
+
+  <!-- ======== HEADER ======== -->
+  <header class="app-header">
+    <h1>
+      <span class="icon">TV</span>
+      创维TV 分屏控制
+    </h1>
+    <div class="conn-status" id="connStatus">
+      <span class="status-dot" id="statusDot"></span>
+      <span id="statusText">未连接</span>
+    </div>
+  </header>
+
+  <!-- ======== CONNECTION ======== -->
+  <section class="conn-panel" id="connPanel">
+    <div class="section-title">连接设置</div>
+    <div class="conn-form">
+      <label for="tvIp">IP</label>
+      <input type="text" id="tvIp" placeholder="192.168.1.100" value="192.168.1.100">
+      <label for="tvPort">端口</label>
+      <input type="number" id="tvPort" placeholder="9527" value="9527" min="1" max="65535" style="max-width:90px">
+      <button class="btn btn-primary" id="btnConnect">连接</button>
+      <button class="btn btn-danger" id="btnDisconnect" style="display:none">断开</button>
+    </div>
+    <div class="feedback-bar" id="feedbackBar"></div>
+  </section>
+
+  <!-- ======== LAYOUT ======== -->
+  <section class="layout-section" id="layoutSection">
+    <div class="section-title">布局选择</div>
+
+    <!-- Preset templates -->
+    <div class="layout-templates" id="layoutTemplates">
+      <button class="layout-btn active" data-layout="full">
+        <div class="layout-thumb thumb-full">
+          <div class="thumb-zone"></div>
+        </div>
+        <span class="layout-label">全屏</span>
+      </button>
+      <button class="layout-btn" data-layout="hsplit">
+        <div class="layout-thumb thumb-hsplit">
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+        </div>
+        <span class="layout-label">水平二分</span>
+      </button>
+      <button class="layout-btn" data-layout="vsplit">
+        <div class="layout-thumb thumb-vsplit">
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+        </div>
+        <span class="layout-label">垂直二分</span>
+      </button>
+      <button class="layout-btn" data-layout="main2">
+        <div class="layout-thumb thumb-main2">
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+        </div>
+        <span class="layout-label">主+副(2:1)</span>
+      </button>
+      <button class="layout-btn" data-layout="quad">
+        <div class="layout-thumb thumb-quad">
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+        </div>
+        <span class="layout-label">田字格</span>
+      </button>
+      <button class="layout-btn" data-layout="3p1">
+        <div class="layout-thumb thumb-3p1">
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone tz-main"></div>
+        </div>
+        <span class="layout-label">3+1</span>
+      </button>
+      <button class="layout-btn" data-layout="2x3">
+        <div class="layout-thumb thumb-2x3">
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+        </div>
+        <span class="layout-label">2x3</span>
+      </button>
+      <button class="layout-btn" data-layout="3x3">
+        <div class="layout-thumb thumb-3x3">
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+        </div>
+        <span class="layout-label">3x3</span>
+      </button>
+      <button class="layout-btn" data-layout="4p1">
+        <div class="layout-thumb thumb-4p1">
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone"></div>
+          <div class="thumb-zone tz-main"></div>
+        </div>
+        <span class="layout-label">4+1</span>
+      </button>
+    </div>
+
+    <!-- Custom layout -->
+    <div class="custom-layout-row">
+      <label>自定义</label>
+      <input type="range" id="customSlider" min="1" max="24" value="4">
+      <span class="zone-count" id="customCount">4</span>
+      <span style="font-size:0.78rem;color:var(--text-muted)">区</span>
+      <button class="btn btn-sm" id="btnApplyCustom">应用</button>
+    </div>
+
+    <!-- Preview -->
+    <div class="preview-area">
+      <div class="preview-grid" id="previewGrid"></div>
+    </div>
+  </section>
+
+  <!-- ======== CONTENT ======== -->
+  <section class="content-panel" id="contentPanel">
+    <div class="content-panel-header">
+      <span class="zone-id-label" id="selectedZoneLabel">未选中分区</span>
+      <button class="btn btn-sm" id="btnClearZone">清空此区</button>
+    </div>
+
+    <!-- Content type tabs -->
+    <div class="content-type-tabs" id="contentTypeTabs">
+      <button class="type-tab active" data-type="image">图片</button>
+      <button class="type-tab" data-type="video">视频</button>
+      <button class="type-tab" data-type="web">网页</button>
+      <button class="type-tab" data-type="text">文字</button>
+      <button class="type-tab" data-type="slideshow">幻灯片</button>
+      <button class="type-tab" data-type="scrolltext">滚动文字</button>
+      <button class="type-tab" data-type="clock">时钟</button>
+    </div>
+
+    <!-- === IMAGE === -->
+    <div class="content-form active" id="form-image">
+      <div class="form-group">
+        <label>上传图片</label>
+        <input type="file" id="imgFile" accept="image/*" class="file-input">
+        <span class="file-hint">从相册选择或拍照</span>
+      </div>
+      <div class="form-group">
+        <label>显示模式</label>
+        <select id="imgFit">
+          <option value="cover">裁剪填充</option>
+          <option value="contain">完整显示</option>
+          <option value="fill">拉伸填充</option>
+        </select>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" id="imgApply"><span class="upload-icon">📤</span> 上传并应用</button>
+      </div>
+    </div>
+
+    <!-- === VIDEO === -->
+    <div class="content-form" id="form-video">
+      <div class="form-group">
+        <label>上传视频</label>
+        <input type="file" id="videoFile" accept="video/*" class="file-input">
+        <span class="file-hint">选择本地视频文件</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>
+            <input type="checkbox" id="videoLoop"> 循环播放
+          </label>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>
+            <input type="checkbox" id="videoMute" checked> 静音
+          </label>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" id="videoApply"><span class="upload-icon">📤</span> 上传并应用</button>
+      </div>
+    </div>
+
+    <!-- === WEB === -->
+    <div class="content-form" id="form-web">
+      <div class="form-group">
+        <label>网页 URL</label>
+        <input type="url" id="webUrl" placeholder="https://example.com">
+      </div>
+      <div style="text-align:center;color:var(--text-muted);font-size:0.75rem;margin:6px 0;">— 或直接粘贴 HTML —</div>
+      <div class="form-group">
+        <label>HTML 内容</label>
+        <textarea id="webHtml" placeholder="&lt;h1&gt;Hello&lt;/h1&gt;"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" id="webApply">应用到分区</button>
+      </div>
+    </div>
+
+    <!-- === TEXT === -->
+    <div class="content-form" id="form-text">
+      <div class="form-group">
+        <label>文字内容</label>
+        <textarea id="textContent" placeholder="请输入要显示的文字..." rows="3"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>字号(px)</label>
+          <input type="number" id="textSize" value="48" min="12" max="200" step="4">
+        </div>
+        <div class="form-group">
+          <label>对齐</label>
+          <select id="textAlign">
+            <option value="center">居中</option>
+            <option value="left">左对齐</option>
+            <option value="right">右对齐</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>颜色</label>
+        <div class="color-input-row">
+          <input type="color" id="textColor" value="#ffffff">
+          <input type="text" id="textColorHex" value="#ffffff" placeholder="#ffffff">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" id="textApply">应用到分区</button>
+      </div>
+    </div>
+
+    <!-- === SLIDESHOW === -->
+    <div class="content-form" id="form-slideshow">
+      <div class="form-group">
+        <label>上传多张图片</label>
+        <input type="file" id="slideFiles" accept="image/*" multiple class="file-input">
+        <span class="file-hint">可多选，选中的图片将循环播放</span>
+      </div>
+      <div class="form-group">
+        <label>切换间隔（秒）</label>
+        <input type="number" id="slideInterval" value="5" min="1" max="999" step="1">
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" id="slideApply"><span class="upload-icon">📤</span> 上传并应用</button>
+      </div>
+    </div>
+
+    <!-- === SCROLL TEXT === -->
+    <div class="content-form" id="form-scrolltext">
+      <div class="form-group">
+        <label>滚动文字</label>
+        <textarea id="scrollContent" placeholder="请输入要滚动的文字..." rows="3"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>速度</label>
+          <select id="scrollSpeed">
+            <option value="slow">慢速</option>
+            <option value="normal" selected>中速</option>
+            <option value="fast">快速</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>方向</label>
+          <select id="scrollDirection">
+            <option value="left">向左</option>
+            <option value="right" selected>向右</option>
+            <option value="up">向上</option>
+            <option value="down">向下</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" id="scrollApply">应用到分区</button>
+      </div>
+    </div>
+
+    <!-- === CLOCK === -->
+    <div class="content-form" id="form-clock">
+      <div class="form-group">
+        <label>时间格式</label>
+        <select id="clockFormat">
+          <option value="HH:mm:ss">HH:mm:ss</option>
+          <option value="HH:mm">HH:mm</option>
+          <option value="yyyy-MM-dd HH:mm:ss">yyyy-MM-dd HH:mm:ss</option>
+          <option value="yyyy-MM-dd HH:mm">yyyy-MM-dd HH:mm</option>
+          <option value="MM/dd HH:mm">MM/dd HH:mm</option>
+          <option value="HH:mm:ss (EEE)">HH:mm:ss (周X)</option>
+          <option value="yyyy年MM月dd日 HH:mm">yyyy年MM月dd日 HH:mm</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>字号(px)</label>
+          <input type="number" id="clockSize" value="64" min="12" max="300" step="4">
+        </div>
+        <div class="form-group">
+          <label>颜色</label>
+          <div class="color-input-row">
+            <input type="color" id="clockColor" value="#ffffff">
+            <input type="text" id="clockColorHex" value="#ffffff" placeholder="#ffffff">
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" id="clockApply">应用到分区</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Upload progress bar -->
+  <div class="upload-progress" id="uploadProgress" style="display:none">
+    <div class="upload-progress-label" id="uploadProgressLabel">上传中...</div>
+    <div class="upload-progress-track">
+      <div class="upload-progress-bar" id="uploadProgressBar" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- ======== TV STATUS ======== -->
+  <section class="status-panel" id="statusPanel">
+    <div class="section-title">电视端状态</div>
+    <div class="status-grid" id="statusGrid">
+      <div class="status-item">
+        <div class="label">设备</div>
+        <div class="value tv-device-name" id="tvDeviceName">—</div>
+      </div>
+      <div class="status-item">
+        <div class="label">布局</div>
+        <div class="value" id="tvLayout">—</div>
+      </div>
+      <div class="status-item">
+        <div class="label">分区数</div>
+        <div class="value" id="tvZones">—</div>
+      </div>
+      <div class="status-item" style="grid-column:1/-1">
+        <div class="label">各分区内容类型</div>
+        <div class="zone-list-pills" id="zonePills">
+          <span style="color:var(--text-muted);font-size:0.78rem;">暂无数据</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======== BOTTOM ACTION BAR ======== -->
+  <div class="action-bar">
+    <button class="btn btn-primary" id="btnSendLayout">发送布局</button>
+    <button class="btn" id="btnGetStatus">刷新状态</button>
+    <button class="btn btn-sm" id="btnSetBg">设置背景</button>
+  </div>
+</div>
+
+<!-- Background color modal (simple inline) -->
+<div id="bgModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;" onclick="if(event.target===this)closeBgModal()">
+  <div style="background:var(--bg-card);border:1px solid var(--border-color);border-radius:var(--radius);padding:20px;width:90%;max-width:320px;">
+    <div class="section-title" style="margin-bottom:12px;">设置背景颜色</div>
+    <div class="form-group">
+      <label>颜色值</label>
+      <div class="color-input-row">
+        <input type="color" id="bgColorPicker" value="#000000">
+        <input type="text" id="bgColorHex" value="#000000" placeholder="#000000">
+      </div>
+    </div>
+    <div class="form-actions" style="justify-content:flex-end;">
+      <button class="btn btn-sm" onclick="closeBgModal()">取消</button>
+      <button class="btn btn-primary btn-sm" id="bgApply">应用</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
