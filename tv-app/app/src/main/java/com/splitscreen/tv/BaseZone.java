@@ -139,25 +139,31 @@ public class BaseZone extends FrameLayout {
             fullUrl = "http://127.0.0.1:9528" + url;
         }
 
-        playerView = new PlayerView(getContext());
-        playerView.setLayoutParams(new LayoutParams(
-                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        playerView.setUseController(false);
-        playerView.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FILL);
+        try {
+            playerView = new PlayerView(getContext());
+            playerView.setLayoutParams(new LayoutParams(
+                    LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+            playerView.setUseController(false);
+            playerView.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FILL);
 
-        exoPlayer = new ExoPlayer.Builder(getContext())
-                .setHandleAudioBecomingNoisy(true)
-                .build();
-        exoPlayer.setRepeatMode(loop ? Player.REPEAT_MODE_ALL : Player.REPEAT_MODE_OFF);
-        exoPlayer.setVolume(mute ? 0f : 1f);
+            exoPlayer = new ExoPlayer.Builder(getContext())
+                    .setHandleAudioBecomingNoisy(true)
+                    .build();
+            exoPlayer.setRepeatMode(loop ? Player.REPEAT_MODE_ALL : Player.REPEAT_MODE_OFF);
+            exoPlayer.setVolume(mute ? 0f : 1f);
 
-        MediaItem mediaItem = MediaItem.fromUri(fullUrl);
-        exoPlayer.setMediaItem(mediaItem);
-        exoPlayer.prepare();
-        exoPlayer.play();
+            MediaItem mediaItem = MediaItem.fromUri(fullUrl);
+            exoPlayer.setMediaItem(mediaItem);
+            exoPlayer.prepare();
+            exoPlayer.play();
 
-        playerView.setPlayer(exoPlayer);
-        addView(playerView);
+            playerView.setPlayer(exoPlayer);
+            addView(playerView);
+        } catch (Exception e) {
+            Log.e(TAG, "视频播放失败: " + e.getMessage());
+            // 回退：显示文字提示
+            showText("视频加载失败", "#FF6666", 16, "center");
+        }
     }
 
     // ========== 网页 ==========
@@ -273,62 +279,78 @@ public class BaseZone extends FrameLayout {
         clearContent();
         contentType = "scroll";
 
-        textView = new TextView(getContext());
-        textView.setLayoutParams(new LayoutParams(
-                LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
-        textView.setText(text);
-        textView.setTextSize(18);
-        textView.setTextColor(Color.WHITE);
-        textView.setSingleLine(false);
-        textView.setGravity(Gravity.CENTER);
-
         final int frameDelay = 30;  // ms
         scrollHandler = new Handler(Looper.getMainLooper());
 
         switch (direction) {
             case "up": {
+                // 向上滚动 - 文字从底部出现，向上移动
+                textView = new TextView(getContext());
                 textView.setLayoutParams(new LayoutParams(
                         LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+                textView.setText(text);
+                textView.setTextSize(18);
+                textView.setTextColor(Color.WHITE);
+                textView.setSingleLine(false);
+                textView.setGravity(Gravity.CENTER);
                 addView(textView);
-                final int totalHeight = getResources().getDisplayMetrics().heightPixels;
-                final float[] translateY = {totalHeight};
 
-                scrollHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        translateY[0] -= speed * 30f / 1000f;
-                        textView.setTranslationY(translateY[0]);
-                        if (translateY[0] + textView.getHeight() > 0) {
-                            scrollHandler.postDelayed(this, frameDelay);
-                        } else {
-                            translateY[0] = totalHeight;
-                            scrollHandler.postDelayed(this, frameDelay);
+                // 等布局完成获取实际高度，再开始滚动
+                post(() -> {
+                    final int zoneHeight = getHeight();
+                    final float[] translateY = {(float) zoneHeight};
+
+                    scrollHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            translateY[0] -= speed * 30f / 1000f;
+                            textView.setTranslationY(translateY[0]);
+                            if (translateY[0] + textView.getHeight() > 0) {
+                                scrollHandler.postDelayed(this, frameDelay);
+                            } else {
+                                translateY[0] = zoneHeight;
+                                scrollHandler.postDelayed(this, frameDelay);
+                            }
                         }
-                    }
+                    });
                 });
                 break;
             }
             case "left": {
+                // 向左滚动 - 文字从右侧进入，向左移动
+                textView = new TextView(getContext());
+                textView.setLayoutParams(new LayoutParams(
+                        LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
+                textView.setText(text);
+                textView.setTextSize(20);
+                textView.setTextColor(Color.WHITE);
+                textView.setSingleLine(true);
+                textView.setGravity(Gravity.CENTER_VERTICAL);
                 addView(textView);
-                final float[] translateX = {getWidth()};
-                scrollHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        textView.setSingleLine(true);
-                        translateX[0] -= speed * 30f / 1000f;
-                        textView.setTranslationX(translateX[0]);
-                        if (translateX[0] + textView.getWidth() > 0) {
-                            scrollHandler.postDelayed(this, frameDelay);
-                        } else {
-                            translateX[0] = getWidth();
-                            scrollHandler.postDelayed(this, frameDelay);
+
+                // 等布局完成获取实际宽度，再开始滚动
+                post(() -> {
+                    final float startX = (float) getWidth();
+                    final float[] translateX = {startX};
+
+                    scrollHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            translateX[0] -= speed * 30f / 1000f;
+                            textView.setTranslationX(translateX[0]);
+                            if (translateX[0] + textView.getWidth() > 0) {
+                                scrollHandler.postDelayed(this, frameDelay);
+                            } else {
+                                translateX[0] = startX;
+                                scrollHandler.postDelayed(this, frameDelay);
+                            }
                         }
-                    }
+                    });
                 });
                 break;
             }
             default: {
-                // 垂直滚动
+                // 未知方向，显示静态文字
                 showText(text, "#FFFFFF", 18, "center");
                 break;
             }
