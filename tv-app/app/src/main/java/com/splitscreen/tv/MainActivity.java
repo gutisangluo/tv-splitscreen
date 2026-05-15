@@ -176,12 +176,11 @@ private void handleMessage(String message) {
                     String contentType = msg.getString("content_type");
                     JSONObject params = msg.getJSONObject("params");
 
-                    // 滚动文字：显示在屏幕顶部/底部跑马灯条，不在分区内
+                    // 滚动文字：显示在屏幕底部跑马灯条，不在分区内
                     if ("scroll".equals(contentType) || "scrolltext".equals(contentType)) {
                         String scrollText = params.optString("text", "");
-                        String position = params.optString("position", "top");
                         String direction = params.optString("direction", "left");
-                        showTicker(scrollText, position, direction);
+                        showTicker(scrollText, direction);
                         break;
                     }
 
@@ -232,8 +231,8 @@ private void handleMessage(String message) {
         }
     }
 
-    /** 显示屏幕顶部/底部滚动文字条 */
-    private void showTicker(String text, String position, String direction) {
+    /** 显示屏幕底部滚动文字条 */
+    private void showTicker(String text, String direction) {
         if (tickerText == null) return;
 
         // 取消旧动画
@@ -245,12 +244,9 @@ private void handleMessage(String message) {
         tickerText.setTranslationY(0);
         tickerText.setVisibility(View.GONE);
 
-        // 清空文字再设
-        tickerText.setText("");
-
-        // 设置位置（顶部/底部）
+        // 固定在底部
         FrameLayout.LayoutParams tlp = (FrameLayout.LayoutParams) tickerText.getLayoutParams();
-        tlp.gravity = "bottom".equals(position) ? Gravity.BOTTOM : Gravity.TOP;
+        tlp.gravity = Gravity.BOTTOM;
         tickerText.setLayoutParams(tlp);
 
         // 设置背景色

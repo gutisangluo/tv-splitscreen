@@ -384,11 +384,10 @@ public class BaseZone extends FrameLayout {
 
                     tv.setText(display.toString());
 
-                    // 自动字号：分区短边 / (行数 * 2.2)
+                    // 自动字号：用 px 单位，分区短边 / (行数 * 3.5)
                     int shortSide = Math.min(zoneW, zoneH);
-                    int autoSize = Math.max(12, (int)(shortSide / (lines * 2.2)));
-                    tv.setTextSize(autoSize);
-                    tv.setLineSpacing(0, 1.0f);
+                    int autoSizePx = Math.max(20, (int)(shortSide / (lines * 3.5f)));
+                    tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, autoSizePx);
 
                     clockHandler.postDelayed(this, 1000);
                 }
