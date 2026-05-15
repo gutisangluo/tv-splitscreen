@@ -1,5 +1,7 @@
 package com.splitscreen.tv;
 
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Color;
@@ -61,6 +63,7 @@ public class BaseZone extends FrameLayout {
     // 滚动
     private Handler scrollHandler;
     private int scrollOffset = 0;
+    private ObjectAnimator scrollAnim;
 
     // 时钟
     private Handler clockHandler;
@@ -279,73 +282,56 @@ public class BaseZone extends FrameLayout {
         clearContent();
         contentType = "scroll";
 
-        final int frameDelay = 30;
-        scrollHandler = new Handler(Looper.getMainLooper());
+        // 速度：1-100 → 动画时长 20秒-1秒
+        long duration = Math.max(1000, 20000 - speed * 190L);
 
         switch (direction) {
             case "up": {
-                textView = new TextView(getContext());
-                textView.setLayoutParams(new LayoutParams(
+                final TextView tv = new TextView(getContext());
+                tv.setLayoutParams(new LayoutParams(
                         LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
-                textView.setText(text);
-                textView.setTextSize(18);
-                textView.setTextColor(Color.WHITE);
-                textView.setSingleLine(false);
-                textView.setGravity(Gravity.CENTER);
-                textView.setVisibility(INVISIBLE); // 先隐藏
-                addView(textView);
+                tv.setText(text);
+                tv.setTextSize(18);
+                tv.setTextColor(Color.WHITE);
+                tv.setSingleLine(false);
+                tv.setGravity(Gravity.CENTER);
+                addView(tv);
 
-                // 等布局完成：移到分区底部再显示+启动滚动
+                // 等布局完成再启动动画
                 post(() -> {
                     final int h = getHeight();
-                    textView.setTranslationY(h);
-                    textView.setVisibility(VISIBLE);
-
-                    final float[] y = {(float) h};
-                    scrollHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            y[0] -= speed * 30f / 1000f;
-                            textView.setTranslationY(y[0]);
-                            scrollHandler.postDelayed(this, y[0] + textView.getHeight() > 0 ? frameDelay : frameDelay);
-                            if (y[0] + textView.getHeight() <= 0) {
-                                y[0] = h;
-                            }
-                        }
-                    });
+                    tv.setTranslationY(h);
+                    // 从 h 滚动到 -tvHeight
+                    ObjectAnimator anim = ObjectAnimator.ofFloat(tv, "translationY", h, -tv.getHeight());
+                    anim.setDuration(duration);
+                    anim.setRepeatCount(ValueAnimator.INFINITE);
+                    anim.setRepeatMode(ValueAnimator.RESTART);
+                    anim.start();
+                    scrollAnim = anim;
                 });
                 break;
             }
             case "left": {
-                textView = new TextView(getContext());
-                textView.setLayoutParams(new LayoutParams(
+                final TextView tv = new TextView(getContext());
+                tv.setLayoutParams(new LayoutParams(
                         LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
-                textView.setText(text);
-                textView.setTextSize(20);
-                textView.setTextColor(Color.WHITE);
-                textView.setSingleLine(true);
-                textView.setGravity(Gravity.CENTER_VERTICAL);
-                textView.setVisibility(INVISIBLE); // 先隐藏
-                addView(textView);
+                tv.setText(text);
+                tv.setTextSize(20);
+                tv.setTextColor(Color.WHITE);
+                tv.setSingleLine(true);
+                tv.setGravity(Gravity.CENTER_VERTICAL);
+                addView(tv);
 
-                // 等布局完成：移到分区右侧再显示+启动滚动
                 post(() -> {
                     final int w = getWidth();
-                    textView.setTranslationX(w);
-                    textView.setVisibility(VISIBLE);
-
-                    final float[] x = {(float) w};
-                    scrollHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            x[0] -= speed * 30f / 1000f;
-                            textView.setTranslationX(x[0]);
-                            scrollHandler.postDelayed(this, frameDelay);
-                            if (x[0] + textView.getWidth() <= 0) {
-                                x[0] = w;
-                            }
-                        }
-                    });
+                    tv.setTranslationX(w);
+                    // 从 w 滚动到 -tvWidth
+                    ObjectAnimator anim = ObjectAnimator.ofFloat(tv, "translationX", w, -tv.getWidth());
+                    anim.setDuration(duration);
+                    anim.setRepeatCount(ValueAnimator.INFINITE);
+                    anim.setRepeatMode(ValueAnimator.RESTART);
+                    anim.start();
+                    scrollAnim = anim;
                 });
                 break;
             }
@@ -403,6 +389,10 @@ public class BaseZone extends FrameLayout {
         if (scrollHandler != null) {
             scrollHandler.removeCallbacksAndMessages(null);
             scrollHandler = null;
+        }
+        if (scrollAnim != null) {
+            scrollAnim.cancel();
+            scrollAnim = null;
         }
         if (clockHandler != null) {
             clockHandler.removeCallbacksAndMessages(null);

@@ -81,7 +81,7 @@
     web: { apply: 'webApply', fields: ['webUrl', 'webHtml'] },
     text: { apply: 'textApply', fields: ['textContent', 'textSize', 'textAlign', 'textColor', 'textColorHex'] },
     slideshow: { apply: 'slideApply', fields: ['slideFiles', 'slideInterval'] },
-    scrolltext: { apply: 'scrollApply', fields: ['scrollContent', 'scrollSpeed', 'scrollDirection'] },
+    scrolltext: { apply: 'scrollApply', fields: ['scrollContent', 'scrollSpeed', 'scrollDirection', 'scrollPosition'] },
     clock: { apply: 'clockApply', fields: ['clockFormat', 'clockSize', 'clockColor', 'clockColorHex'] },
   };
 
@@ -841,9 +841,11 @@
       params.text = params.scrollContent;
       params.speed = params.scrollSpeed;
       params.direction = params.scrollDirection;
+      params.position = params.scrollPosition || 'top';
       delete params.scrollContent;
       delete params.scrollSpeed;
       delete params.scrollDirection;
+      delete params.scrollPosition;
     }
 
     // Send non-file type content

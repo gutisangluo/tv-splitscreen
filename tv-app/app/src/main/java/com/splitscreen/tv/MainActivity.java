@@ -1,12 +1,16 @@
 package com.splitscreen.tv;
 
+import android.animation.ObjectAnimator;
+import android.animation.ValueAnimator;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
 import android.widget.FrameLayout;
@@ -36,6 +40,8 @@ public class MainActivity extends AppCompatActivity {
     private FileServer fileServer;
     private Handler mainHandler;
     private boolean showingInfo = false;
+    private TextView tickerText;
+    private ObjectAnimator tickerAnim;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -89,6 +95,23 @@ public class MainActivity extends AppCompatActivity {
         String ip = getLocalIpAddress();
         showConnectionInfo("IP: " + ip + ":" + WS_PORT + " 等待连接...", false);
         Log.d(TAG, "电视端已启动, IP: " + ip + " 端口: " + WS_PORT);
+
+        // 创建屏幕顶部/底部滚动文字条（初始隐藏）
+        tickerText = new TextView(this);
+        tickerText.setTextColor(Color.WHITE);
+        tickerText.setTypeface(Typeface.DEFAULT_BOLD);
+        tickerText.setTextSize(16);
+        tickerText.setPadding(20, 8, 20, 8);
+        tickerText.setSingleLine(true);
+        tickerText.setEllipsize(null);
+        tickerText.setVisibility(View.GONE);
+        FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        tlp.gravity = Gravity.TOP; // 默认顶部
+        tickerText.setLayoutParams(tlp);
+        tickerText.setBackgroundColor(Color.parseColor("#88000000"));
+        container.addView(tickerText);
     }
 
     private void initWebSocket() {
@@ -152,6 +175,16 @@ private void handleMessage(String message) {
                     int zoneId = msg.getInt("zone_id");
                     String contentType = msg.getString("content_type");
                     JSONObject params = msg.getJSONObject("params");
+
+                    // 滚动文字：显示在屏幕顶部/底部跑马灯条，不在分区内
+                    if ("scroll".equals(contentType) || "scrolltext".equals(contentType)) {
+                        String scrollText = params.optString("text", "");
+                        String position = params.optString("position", "top");
+                        String direction = params.optString("direction", "left");
+                        showTicker(scrollText, position, direction);
+                        break;
+                    }
+
                     zoneManager.setZoneContent(zoneId, contentType, params);
                     sendStatus();
                     break;
@@ -197,6 +230,86 @@ private void handleMessage(String message) {
         if (wsServer != null) {
             wsServer.broadcastMessage(zoneManager.getStatus().toString());
         }
+    }
+
+    /** 显示屏幕顶部/底部滚动文字条 */
+    private void showTicker(String text, String position, String direction) {
+        if (tickerText == null) return;
+
+        // 取消旧动画
+        if (tickerAnim != null) {
+            tickerAnim.cancel();
+            tickerAnim = null;
+        }
+        tickerText.setTranslationX(0);
+        tickerText.setTranslationY(0);
+        tickerText.setVisibility(View.GONE);
+
+        // 清空文字再设
+        tickerText.setText("");
+
+        // 设置位置（顶部/底部）
+        FrameLayout.LayoutParams tlp = (FrameLayout.LayoutParams) tickerText.getLayoutParams();
+        tlp.gravity = "bottom".equals(position) ? Gravity.BOTTOM : Gravity.TOP;
+        tickerText.setLayoutParams(tlp);
+
+        // 设置背景色
+        tickerText.setBackgroundColor(Color.parseColor("#88000000"));
+        tickerText.setText(text);
+        tickerText.setVisibility(View.VISIBLE);
+
+        tickerText.postDelayed(() -> {
+            // 等布局完成获取宽度
+            final int barW = tickerText.getWidth();
+            if (barW <= 0) {
+                tickerText.post(() -> startTickerAnim(direction));
+            } else {
+                startTickerAnim(direction);
+            }
+        }, 100);
+    }
+
+    private void startTickerAnim(String direction) {
+        if ("up".equals(direction) || "down".equals(direction)) {
+            // 上下滚动：从底部往上（或从顶部往下）
+            // 简单实现：当前支持向上滚动
+            tickerText.setSingleLine(false);
+            tickerText.setMaxLines(1);
+            tickerText.setSingleLine(true);
+            // 水平跑马灯更合适，上下滚动用整屏滚动
+            // 这里用水平滚动
+            startMarquee();
+        } else {
+            // 默认水平滚动（跑马灯）
+            startMarquee();
+        }
+    }
+
+    private void startMarquee() {
+        tickerText.setSingleLine(true);
+        tickerText.setHorizontallyScrolling(true);
+        tickerText.setSelected(true);
+        // Android 原生 marquee 需要 focus
+        tickerText.setFocusable(true);
+        tickerText.setFocusableInTouchMode(true);
+        tickerText.requestFocus();
+        // 也可以用 ObjectAnimator 手动控制
+        // 但如果文本长度小于屏幕宽度，原生 marquee 不滚动
+        // 用 ObjectAnimator 确保始终滚动
+        tickerText.post(() -> {
+            int w = tickerText.getWidth();
+            int tw = (int) tickerText.getPaint().measureText(tickerText.getText().toString());
+            if (tw > w) {
+                // 文字超出屏幕宽度才需要滚动
+                ObjectAnimator anim = ObjectAnimator.ofFloat(tickerText, "translationX",
+                        (float) w, (float) -tw);
+                anim.setDuration(tw * 20L); // 每像素20ms
+                anim.setRepeatCount(ValueAnimator.INFINITE);
+                anim.setRepeatMode(ValueAnimator.RESTART);
+                anim.start();
+                tickerAnim = anim;
+            }
+        });
     }
 
     private void showConnectionInfo(String text, boolean persistent) {
@@ -304,6 +417,10 @@ private void handleMessage(String message) {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (tickerAnim != null) {
+            tickerAnim.cancel();
+            tickerAnim = null;
+        }
         if (wsServer != null) {
             try {
                 wsServer.stop(1000);
