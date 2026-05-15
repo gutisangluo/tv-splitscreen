@@ -347,30 +347,53 @@ public class BaseZone extends FrameLayout {
         clearContent();
         contentType = "clock";
 
-        textView = new TextView(getContext());
-        textView.setLayoutParams(new LayoutParams(
+        final TextView tv = new TextView(getContext());
+        tv.setLayoutParams(new LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        textView.setGravity(Gravity.CENTER);
-        textView.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL));
-
+        tv.setGravity(Gravity.CENTER);
+        tv.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL));
+        tv.setTextColor(Color.WHITE);
         try {
-            textView.setTextColor(Color.parseColor(color));
-        } catch (Exception e) {
-            textView.setTextColor(Color.WHITE);
-        }
-        textView.setTextSize(fontSize);
+            tv.setTextColor(Color.parseColor(color));
+        } catch (Exception e) { /* ignore */ }
 
-        clockHandler = new Handler(Looper.getMainLooper());
-        clockHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(format, java.util.Locale.getDefault());
-                textView.setText(sdf.format(new java.util.Date()));
-                clockHandler.postDelayed(this, 1000);
-            }
+        addView(tv);
+
+        // 等布局完成，根据分区大小自动调整字号，日期时间自动分行
+        post(() -> {
+            final int zoneH = getHeight();
+            final int zoneW = getWidth();
+
+            clockHandler = new Handler(Looper.getMainLooper());
+            clockHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(
+                            format, java.util.Locale.getDefault());
+                    String raw = sdf.format(new java.util.Date());
+
+                    // 自动分行：按空格拆分日期和时间
+                    String[] parts = raw.split(" ");
+                    StringBuilder display = new StringBuilder();
+                    int lines = parts.length;
+                    for (int i = 0; i < parts.length; i++) {
+                        if (i > 0) display.append("\n");
+                        display.append(parts[i]);
+                    }
+                    if (lines == 0) { display.append(raw); lines = 1; }
+
+                    tv.setText(display.toString());
+
+                    // 自动字号：分区短边 / (行数 * 2.2)
+                    int shortSide = Math.min(zoneW, zoneH);
+                    int autoSize = Math.max(12, (int)(shortSide / (lines * 2.2)));
+                    tv.setTextSize(autoSize);
+                    tv.setLineSpacing(0, 1.0f);
+
+                    clockHandler.postDelayed(this, 1000);
+                }
+            });
         });
-
-        addView(textView);
     }
 
     // ========== 清空 ==========
