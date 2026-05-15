@@ -41,17 +41,17 @@ public class ZoneManager {
         full.add(new ZoneRect(0, 0, 100, 100, "full"));
         LAYOUT_TEMPLATES.put("full", full);
 
-        // 水平二等分 (2分区)
-        List<ZoneRect> h2 = new ArrayList<>();
-        h2.add(new ZoneRect(0, 0, 50, 100, "left"));
-        h2.add(new ZoneRect(50, 0, 50, 100, "right"));
-        LAYOUT_TEMPLATES.put("hsplit", h2);
+        // 水平二分 — 水平分割线，上半+下半
+        List<ZoneRect> horiz = new ArrayList<>();
+        horiz.add(new ZoneRect(0, 0, 100, 50, "top"));
+        horiz.add(new ZoneRect(0, 50, 100, 50, "bottom"));
+        LAYOUT_TEMPLATES.put("hsplit", horiz);
 
-        // 垂直二等分 (2分区)
-        List<ZoneRect> v2 = new ArrayList<>();
-        v2.add(new ZoneRect(0, 0, 100, 50, "top"));
-        v2.add(new ZoneRect(0, 50, 100, 50, "bottom"));
-        LAYOUT_TEMPLATES.put("vsplit", v2);
+        // 垂直二分 — 垂直分割线，左半+右半
+        List<ZoneRect> vert = new ArrayList<>();
+        vert.add(new ZoneRect(0, 0, 50, 100, "left"));
+        vert.add(new ZoneRect(50, 0, 50, 100, "right"));
+        LAYOUT_TEMPLATES.put("vsplit", vert);
 
         // 主+副 (2分区, 2:1)
         List<ZoneRect> p2 = new ArrayList<>();

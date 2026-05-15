@@ -269,45 +269,33 @@ private void handleMessage(String message) {
     }
 
     private void startTickerAnim(String direction) {
-        if ("up".equals(direction) || "down".equals(direction)) {
-            // 上下滚动：从底部往上（或从顶部往下）
-            // 简单实现：当前支持向上滚动
-            tickerText.setSingleLine(false);
-            tickerText.setMaxLines(1);
-            tickerText.setSingleLine(true);
-            // 水平跑马灯更合适，上下滚动用整屏滚动
-            // 这里用水平滚动
-            startMarquee();
-        } else {
-            // 默认水平滚动（跑马灯）
-            startMarquee();
-        }
+        // 统一用水平跑马灯，文字从右到左滚动显示全部内容
+        startMarquee();
     }
 
     private void startMarquee() {
         tickerText.setSingleLine(true);
         tickerText.setHorizontallyScrolling(true);
-        tickerText.setSelected(true);
-        // Android 原生 marquee 需要 focus
-        tickerText.setFocusable(true);
-        tickerText.setFocusableInTouchMode(true);
-        tickerText.requestFocus();
-        // 也可以用 ObjectAnimator 手动控制
-        // 但如果文本长度小于屏幕宽度，原生 marquee 不滚动
-        // 用 ObjectAnimator 确保始终滚动
+        tickerText.setVisibility(View.VISIBLE);
+
         tickerText.post(() -> {
             int w = tickerText.getWidth();
-            int tw = (int) tickerText.getPaint().measureText(tickerText.getText().toString());
-            if (tw > w) {
-                // 文字超出屏幕宽度才需要滚动
-                ObjectAnimator anim = ObjectAnimator.ofFloat(tickerText, "translationX",
-                        (float) w, (float) -tw);
-                anim.setDuration(tw * 20L); // 每像素20ms
-                anim.setRepeatCount(ValueAnimator.INFINITE);
-                anim.setRepeatMode(ValueAnimator.RESTART);
-                anim.start();
-                tickerAnim = anim;
-            }
+            String txt = tickerText.getText().toString();
+            // 用 Paint 准确测量文字像素宽度
+            int tw = (int) tickerText.getPaint().measureText(txt);
+            if (tw <= 0) tw = txt.length() * 50;
+
+            // 从屏幕右侧(w)滚动到全部文字离开左侧(-tw)
+            // 确保30个字全部按顺序出现
+            ObjectAnimator anim = ObjectAnimator.ofFloat(tickerText, "translationX",
+                    (float) w, (float) -tw);
+            // 速度按每秒显示约8个字：duration = 字数 × 1000 / 8
+            long duration = Math.max(2000, txt.length() * 125L);
+            anim.setDuration(duration);
+            anim.setRepeatCount(ValueAnimator.INFINITE);
+            anim.setRepeatMode(ValueAnimator.RESTART);
+            anim.start();
+            tickerAnim = anim;
         });
     }
 

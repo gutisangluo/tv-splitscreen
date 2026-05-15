@@ -351,47 +351,40 @@ public class BaseZone extends FrameLayout {
         tv.setLayoutParams(new LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
         tv.setGravity(Gravity.CENTER);
-        tv.setTypeface(Typeface.create("sans-serif-thin", Typeface.NORMAL));
+        tv.setTypeface(Typeface.DEFAULT);
         tv.setTextColor(Color.WHITE);
-        try {
-            tv.setTextColor(Color.parseColor(color));
-        } catch (Exception e) { /* ignore */ }
+        try { tv.setTextColor(Color.parseColor(color)); } catch (Exception e) { }
 
         addView(tv);
 
-        // 等布局完成，根据分区大小自动调整字号，日期时间自动分行
-        post(() -> {
-            final int zoneH = getHeight();
-            final int zoneW = getWidth();
+        clockHandler = new Handler(Looper.getMainLooper());
+        clockHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(
+                        format, java.util.Locale.getDefault());
+                String raw = sdf.format(new java.util.Date());
 
-            clockHandler = new Handler(Looper.getMainLooper());
-            clockHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(
-                            format, java.util.Locale.getDefault());
-                    String raw = sdf.format(new java.util.Date());
-
-                    // 自动分行：按空格拆分日期和时间
-                    String[] parts = raw.split(" ");
-                    StringBuilder display = new StringBuilder();
-                    int lines = parts.length;
-                    for (int i = 0; i < parts.length; i++) {
-                        if (i > 0) display.append("\n");
-                        display.append(parts[i]);
-                    }
-                    if (lines == 0) { display.append(raw); lines = 1; }
-
-                    tv.setText(display.toString());
-
-                    // 自动字号：用 px 单位，分区短边 / (行数 * 3.5)
-                    int shortSide = Math.min(zoneW, zoneH);
-                    int autoSizePx = Math.max(20, (int)(shortSide / (lines * 3.5f)));
-                    tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, autoSizePx);
-
-                    clockHandler.postDelayed(this, 1000);
+                // 自动分行
+                String[] parts = raw.split(" ");
+                StringBuilder display = new StringBuilder();
+                int lines = parts.length;
+                for (int i = 0; i < parts.length; i++) {
+                    if (i > 0) display.append("\n");
+                    display.append(parts[i]);
                 }
-            });
+                if (lines == 0) { display.append(raw); lines = 1; }
+
+                tv.setText(display.toString());
+
+                // 自动字号：分区高度 × 0.3 ÷ 行数
+                int zoneH = getHeight();
+                if (zoneH <= 0) zoneH = getResources().getDisplayMetrics().heightPixels;
+                int autoSizePx = Math.max(16, (int)(zoneH * 0.3f / lines));
+                tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, autoSizePx);
+
+                clockHandler.postDelayed(this, 1000);
+            }
         });
     }
 
