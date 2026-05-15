@@ -279,12 +279,11 @@ public class BaseZone extends FrameLayout {
         clearContent();
         contentType = "scroll";
 
-        final int frameDelay = 30;  // ms
+        final int frameDelay = 30;
         scrollHandler = new Handler(Looper.getMainLooper());
 
         switch (direction) {
             case "up": {
-                // 向上滚动 - 文字从底部出现，向上移动
                 textView = new TextView(getContext());
                 textView.setLayoutParams(new LayoutParams(
                         LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
@@ -293,23 +292,24 @@ public class BaseZone extends FrameLayout {
                 textView.setTextColor(Color.WHITE);
                 textView.setSingleLine(false);
                 textView.setGravity(Gravity.CENTER);
+                textView.setVisibility(INVISIBLE); // 先隐藏
                 addView(textView);
 
-                // 等布局完成获取实际高度，再开始滚动
+                // 等布局完成：移到分区底部再显示+启动滚动
                 post(() -> {
-                    final int zoneHeight = getHeight();
-                    final float[] translateY = {(float) zoneHeight};
+                    final int h = getHeight();
+                    textView.setTranslationY(h);
+                    textView.setVisibility(VISIBLE);
 
+                    final float[] y = {(float) h};
                     scrollHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            translateY[0] -= speed * 30f / 1000f;
-                            textView.setTranslationY(translateY[0]);
-                            if (translateY[0] + textView.getHeight() > 0) {
-                                scrollHandler.postDelayed(this, frameDelay);
-                            } else {
-                                translateY[0] = zoneHeight;
-                                scrollHandler.postDelayed(this, frameDelay);
+                            y[0] -= speed * 30f / 1000f;
+                            textView.setTranslationY(y[0]);
+                            scrollHandler.postDelayed(this, y[0] + textView.getHeight() > 0 ? frameDelay : frameDelay);
+                            if (y[0] + textView.getHeight() <= 0) {
+                                y[0] = h;
                             }
                         }
                     });
@@ -317,7 +317,6 @@ public class BaseZone extends FrameLayout {
                 break;
             }
             case "left": {
-                // 向左滚动 - 文字从右侧进入，向左移动
                 textView = new TextView(getContext());
                 textView.setLayoutParams(new LayoutParams(
                         LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT));
@@ -326,34 +325,33 @@ public class BaseZone extends FrameLayout {
                 textView.setTextColor(Color.WHITE);
                 textView.setSingleLine(true);
                 textView.setGravity(Gravity.CENTER_VERTICAL);
+                textView.setVisibility(INVISIBLE); // 先隐藏
                 addView(textView);
 
-                // 等布局完成获取实际宽度，再开始滚动
+                // 等布局完成：移到分区右侧再显示+启动滚动
                 post(() -> {
-                    final float startX = (float) getWidth();
-                    final float[] translateX = {startX};
+                    final int w = getWidth();
+                    textView.setTranslationX(w);
+                    textView.setVisibility(VISIBLE);
 
+                    final float[] x = {(float) w};
                     scrollHandler.post(new Runnable() {
                         @Override
                         public void run() {
-                            translateX[0] -= speed * 30f / 1000f;
-                            textView.setTranslationX(translateX[0]);
-                            if (translateX[0] + textView.getWidth() > 0) {
-                                scrollHandler.postDelayed(this, frameDelay);
-                            } else {
-                                translateX[0] = startX;
-                                scrollHandler.postDelayed(this, frameDelay);
+                            x[0] -= speed * 30f / 1000f;
+                            textView.setTranslationX(x[0]);
+                            scrollHandler.postDelayed(this, frameDelay);
+                            if (x[0] + textView.getWidth() <= 0) {
+                                x[0] = w;
                             }
                         }
                     });
                 });
                 break;
             }
-            default: {
-                // 未知方向，显示静态文字
+            default:
                 showText(text, "#FFFFFF", 18, "center");
                 break;
-            }
         }
     }
 
