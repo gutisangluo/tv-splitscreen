@@ -242,14 +242,17 @@ private void handleMessage(String message) {
         }
         tickerText.setTranslationX(0);
         tickerText.setTranslationY(0);
-        tickerText.setVisibility(View.GONE);
+
+        // 如果被 removeAllViews 清掉了，重新添加
+        if (tickerText.getParent() == null) {
+            container.addView(tickerText);
+        }
 
         // 固定在底部
         FrameLayout.LayoutParams tlp = (FrameLayout.LayoutParams) tickerText.getLayoutParams();
         tlp.gravity = Gravity.BOTTOM;
         tickerText.setLayoutParams(tlp);
 
-        // 设置背景色
         tickerText.setBackgroundColor(Color.parseColor("#88000000"));
         tickerText.setText(text);
         tickerText.setVisibility(View.VISIBLE);

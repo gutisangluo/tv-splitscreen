@@ -118,6 +118,10 @@ public class ZoneManager {
             rects = LAYOUT_TEMPLATES.get("full");
             layoutName = "full";
         }
+        // 相同布局跳过，避免清除已有分区内容
+        if (layoutName.equals(currentLayout) && !zones.isEmpty()) {
+            return;
+        }
         currentLayout = layoutName;
         applyLayout(rects);
     }
