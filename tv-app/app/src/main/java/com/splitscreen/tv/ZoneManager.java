@@ -266,6 +266,7 @@ public class ZoneManager {
                 break;
 
             case "scroll":
+            case "scrolltext":
                 String scrollText = params.optString("text", "");
                 int speed = params.optInt("speed", 50);
                 String direction = params.optString("direction", "up");

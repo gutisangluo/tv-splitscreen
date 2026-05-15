@@ -20,7 +20,8 @@
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.TvSplitScreen">
+        android:theme="@style/Theme.TvSplitScreen"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"

@@ -100,6 +100,12 @@ public class BaseZone extends FrameLayout {
         clearContent();
         contentType = "image";
 
+        // 相对路径补全为完整 HTTP 地址
+        String fullUrl = url;
+        if (url != null && url.startsWith("/")) {
+            fullUrl = "http://127.0.0.1:9528" + url;
+        }
+
         imageView = new ImageView(getContext());
         imageView.setLayoutParams(new LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
@@ -113,7 +119,7 @@ public class BaseZone extends FrameLayout {
         imageView.setScaleType(scaleType);
 
         Glide.with(getContext())
-                .load(url)
+                .load(fullUrl)
                 .transition(DrawableTransitionOptions.withCrossFade())
                 .into(imageView);
 
@@ -127,10 +133,16 @@ public class BaseZone extends FrameLayout {
         clearContent();
         contentType = "video";
 
+        // 相对路径补全
+        String fullUrl = url;
+        if (url != null && url.startsWith("/")) {
+            fullUrl = "http://127.0.0.1:9528" + url;
+        }
+
         playerView = new PlayerView(getContext());
         playerView.setLayoutParams(new LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        playerView.setUseController(false);  // TV端默认无控制栏
+        playerView.setUseController(false);
         playerView.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FILL);
 
         exoPlayer = new ExoPlayer.Builder(getContext())
@@ -139,7 +151,7 @@ public class BaseZone extends FrameLayout {
         exoPlayer.setRepeatMode(loop ? Player.REPEAT_MODE_ALL : Player.REPEAT_MODE_OFF);
         exoPlayer.setVolume(mute ? 0f : 1f);
 
-        MediaItem mediaItem = MediaItem.fromUri(url);
+        MediaItem mediaItem = MediaItem.fromUri(fullUrl);
         exoPlayer.setMediaItem(mediaItem);
         exoPlayer.prepare();
         exoPlayer.play();
@@ -228,7 +240,9 @@ public class BaseZone extends FrameLayout {
         imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
 
         if (!urls.isEmpty()) {
-            Glide.with(getContext()).load(urls.get(0)).into(imageView);
+            String firstUrl = urls.get(0);
+            if (firstUrl.startsWith("/")) firstUrl = "http://127.0.0.1:9528" + firstUrl;
+            Glide.with(getContext()).load(firstUrl).into(imageView);
         }
 
         addView(imageView);
@@ -241,8 +255,10 @@ public class BaseZone extends FrameLayout {
                 slideIndex = (slideIndex + 1) % urls.size();
                 new Handler(Looper.getMainLooper()).post(() -> {
                     if (imageView != null && slideIndex < urls.size()) {
+                        String slideUrl = urls.get(slideIndex);
+                        if (slideUrl.startsWith("/")) slideUrl = "http://127.0.0.1:9528" + slideUrl;
                         Glide.with(getContext())
-                                .load(urls.get(slideIndex))
+                                .load(slideUrl)
                                 .transition(DrawableTransitionOptions.withCrossFade())
                                 .into(imageView);
                     }
