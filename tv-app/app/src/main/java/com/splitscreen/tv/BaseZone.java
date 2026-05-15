@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -70,8 +71,12 @@ public class BaseZone extends FrameLayout {
     }
 
     private void init() {
-        // 分区默认黑色背景 + 分割边框
-        setBackgroundColor(Color.parseColor("#1a1a1a"));
+        // 分区带分割边框
+        GradientDrawable border = new GradientDrawable();
+        border.setColor(Color.parseColor("#1a1a1a"));  // 底色
+        border.setStroke(2, Color.parseColor("#444444"));  // 2px灰色分割线
+        setBackground(border);
+
         setWillNotDraw(false);
 
         // 硬件加速

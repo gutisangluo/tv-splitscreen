@@ -32,25 +32,14 @@ public class MainActivity extends AppCompatActivity {
     private FrameLayout container;
     private TextView statusText;
     private ZoneManager zoneManager;
-    private WSClient wsClient;
+    private WSServer wsServer;
     private FileServer fileServer;
     private Handler mainHandler;
     private boolean showingInfo = false;
 
-    // 连接配置（可从 intent extra 读取）
-    private String serverHost = null;  // null = 监听模式
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // 读取 intent 参数
-        if (getIntent().hasExtra("server_host")) {
-            serverHost = getIntent().getStringExtra("server_host");
-        }
-        if (getIntent().hasExtra("server_port")) {
-            // 可从 intent 指定端口
-        }
 
         mainHandler = new Handler(Looper.getMainLooper());
 
@@ -96,47 +85,51 @@ public class MainActivity extends AppCompatActivity {
         // 初始化 WebSocket 通信
         initWebSocket();
 
-        // 显示IP信息（5秒后隐藏）
-        showConnectionInfo("启动中...", false);
+        // 显示IP信息和端口（5秒后隐藏）
+        String ip = getLocalIpAddress();
+        showConnectionInfo("IP: " + ip + ":" + WS_PORT + " 等待连接...", false);
+        Log.d(TAG, "电视端已启动, IP: " + ip + " 端口: " + WS_PORT);
     }
 
     private void initWebSocket() {
         try {
-            java.net.URI uri = new java.net.URI("ws://0.0.0.0:" + WS_PORT);
-            wsClient = new WSClient(uri, new WSClient.WsListener() {
-            @Override
-            public void onConnected() {
-                Log.d(TAG, "已连接控制端");
-                mainHandler.post(() -> {
-                    Toast.makeText(MainActivity.this, "已连接控制端", Toast.LENGTH_SHORT).show();
-                    showConnectionInfo("已连接 ✓", false);
-                });
-            }
+            // 电视端作为服务端，等待控制端连接
+            wsServer = new WSServer(WS_PORT, new WSServer.WsListener() {
+                @Override
+                public void onConnected() {
+                    Log.d(TAG, "控制端已连接");
+                    mainHandler.post(() -> {
+                        Toast.makeText(MainActivity.this, "已连接控制端", Toast.LENGTH_SHORT).show();
+                        showConnectionInfo("已连接 ✓", false);
+                    });
+                }
 
-            @Override
-            public void onDisconnected() {
-                Log.d(TAG, "控制端断开");
-                mainHandler.post(() -> {
-                    showConnectionInfo("控制端已断开", true);
-                });
-            }
+                @Override
+                public void onDisconnected() {
+                    Log.d(TAG, "控制端断开");
+                    mainHandler.post(() -> {
+                        showConnectionInfo("控制端已断开", true);
+                    });
+                }
 
-            @Override
-            public void onMessage(String message) {
-                handleMessage(message);
-            }
+                @Override
+                public void onMessage(String message, org.java_websocket.WebSocket conn) {
+                    // WebSocket 消息在后台线程，UI 操作必须切到主线程
+                    mainHandler.post(() -> handleMessage(message));
+                }
 
-            @Override
-            public void onError(String error) {
-                Log.e(TAG, "WS错误: " + error);
-            }
-        });   // end WSClient constructor
+                @Override
+                public void onError(String error) {
+                    Log.e(TAG, "WS错误: " + error);
+                }
+            });
 
-        wsClient.connect();
-    } catch (Exception e) {
-        Log.e(TAG, "WebSocket初始化失败: " + e.getMessage());
+            wsServer.start();
+            Log.d(TAG, "WebSocket 服务已启动, 等待控制端连接端口 " + WS_PORT);
+        } catch (Exception e) {
+            Log.e(TAG, "WebSocket服务启动失败: " + e.getMessage());
+        }
     }
-}
 
 private void handleMessage(String message) {
     try {
@@ -183,8 +176,10 @@ private void handleMessage(String message) {
                     pong.put("device", "创维TV");
                     pong.put("zones", zoneManager.getZoneCount());
                     pong.put("layout", zoneManager.getCurrentLayout());
-                    pong.put("http_port", HTTP_PORT);  // 文件上传端口
-                    wsClient.send(pong.toString());
+                    pong.put("http_port", HTTP_PORT);
+                    if (wsServer != null) {
+                        wsServer.broadcastMessage(pong.toString());
+                    }
                     break;
                 }
 
@@ -199,19 +194,26 @@ private void handleMessage(String message) {
     }
 
     private void sendStatus() {
-        if (wsClient != null && wsClient.isOpen()) {
-            wsClient.send(zoneManager.getStatus().toString());
+        if (wsServer != null) {
+            wsServer.broadcastMessage(zoneManager.getStatus().toString());
         }
     }
 
     private void showConnectionInfo(String text, boolean persistent) {
         if (statusText != null) {
             statusText.setText(text);
-            // 隐藏提示文字（分区布局会覆盖它）
+            // 非持久提示：收到布局后自动隐藏
             if (!persistent) {
                 statusText.postDelayed(() -> {
                     if (zoneManager.getZoneCount() > 0) {
                         statusText.setVisibility(View.GONE);
+                    } else {
+                        // 5秒后还没布局，再等一会
+                        statusText.postDelayed(() -> {
+                            if (zoneManager.getZoneCount() > 0) {
+                                statusText.setVisibility(View.GONE);
+                            }
+                        }, 5000);
                     }
                 }, 5000);
             }
@@ -246,15 +248,25 @@ private void handleMessage(String message) {
     }
 
     private String getLocalIpAddress() {
-        // 尝试通过 WiFi 获取本机 IP
+        // 遍历所有网络接口，找到第一个非 loopback 的 IPv4 地址
         try {
-            java.net.Socket socket = new java.net.Socket("8.8.8.8", 53);
-            String ip = socket.getLocalAddress().getHostAddress();
-            socket.close();
-            return ip;
+            java.util.Enumeration<java.net.NetworkInterface> interfaces =
+                    java.net.NetworkInterface.getNetworkInterfaces();
+            while (interfaces != null && interfaces.hasMoreElements()) {
+                java.net.NetworkInterface intf = interfaces.nextElement();
+                if (intf.isLoopback() || !intf.isUp()) continue;
+                java.util.Enumeration<java.net.InetAddress> addresses = intf.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    java.net.InetAddress addr = addresses.nextElement();
+                    if (addr instanceof java.net.Inet4Address) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
         } catch (Exception e) {
-            return "0.0.0.0";
+            Log.e(TAG, "获取IP失败", e);
         }
+        return "0.0.0.0";
     }
 
     @Override
@@ -292,8 +304,12 @@ private void handleMessage(String message) {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (wsClient != null) {
-            wsClient.disconnect();
+        if (wsServer != null) {
+            try {
+                wsServer.stop(1000);
+            } catch (Exception e) {
+                // ignore
+            }
         }
         if (fileServer != null) {
             fileServer.stop();

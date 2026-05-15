@@ -852,6 +852,12 @@
 
   /** 通过 WebSocket 发送内容到电视 */
   function sendContentParams(type, zone, params) {
+    // 先确保电视端布局正确（用户可能只选了但没点"发送布局"）
+    sendWS({
+      type: 'set_layout',
+      layout: State.currentLayout
+    });
+
     var msg = {
       type: 'set_content',
       zone_id: zone.id,

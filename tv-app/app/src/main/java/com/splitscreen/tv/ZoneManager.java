@@ -6,6 +6,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 
 import com.splitscreen.tv.BaseZone;
@@ -44,19 +45,19 @@ public class ZoneManager {
         List<ZoneRect> h2 = new ArrayList<>();
         h2.add(new ZoneRect(0, 0, 50, 100, "left"));
         h2.add(new ZoneRect(50, 0, 50, 100, "right"));
-        LAYOUT_TEMPLATES.put("2h", h2);
+        LAYOUT_TEMPLATES.put("hsplit", h2);
 
         // 垂直二等分 (2分区)
         List<ZoneRect> v2 = new ArrayList<>();
         v2.add(new ZoneRect(0, 0, 100, 50, "top"));
         v2.add(new ZoneRect(0, 50, 100, 50, "bottom"));
-        LAYOUT_TEMPLATES.put("2v", v2);
+        LAYOUT_TEMPLATES.put("vsplit", v2);
 
         // 主+副 (2分区, 2:1)
         List<ZoneRect> p2 = new ArrayList<>();
         p2.add(new ZoneRect(0, 0, 67, 100, "main"));
         p2.add(new ZoneRect(67, 0, 33, 100, "side"));
-        LAYOUT_TEMPLATES.put("2+1", p2);
+        LAYOUT_TEMPLATES.put("main2", p2);
 
         // 田字格 (4分区)
         List<ZoneRect> g4 = new ArrayList<>();
@@ -64,15 +65,15 @@ public class ZoneManager {
         g4.add(new ZoneRect(50, 0, 50, 50, "tr"));
         g4.add(new ZoneRect(0, 50, 50, 50, "bl"));
         g4.add(new ZoneRect(50, 50, 50, 50, "br"));
-        LAYOUT_TEMPLATES.put("2x2", g4);
+        LAYOUT_TEMPLATES.put("quad", g4);
 
         // 左列3行+右侧大区 (4分区)
         List<ZoneRect> l4 = new ArrayList<>();
-        l4.add(new ZoneRect(0, 0, 33, 33, "lt"));
-        l4.add(new ZoneRect(0, 33, 33, 33, "lc"));
-        l4.add(new ZoneRect(0, 66, 33, 34, "lb"));
-        l4.add(new ZoneRect(33, 0, 67, 100, "rmain"));
-        LAYOUT_TEMPLATES.put("3+1", l4);
+        l4.add(new ZoneRect(0, 0, 50, 33, "lt"));
+        l4.add(new ZoneRect(0, 33, 50, 33, "lc"));
+        l4.add(new ZoneRect(0, 66, 50, 34, "lb"));
+        l4.add(new ZoneRect(50, 0, 50, 100, "rmain"));
+        LAYOUT_TEMPLATES.put("3p1", l4);
 
         // 2行3列 (6分区)
         List<ZoneRect> s6 = new ArrayList<>();
@@ -92,14 +93,14 @@ public class ZoneManager {
         }
         LAYOUT_TEMPLATES.put("3x3", n9);
 
-        // 田字格+中心大区 (5分区)
+        // 4角+中心 (5分区)
         List<ZoneRect> f5 = new ArrayList<>();
-        f5.add(new ZoneRect(0, 0, 50, 50, "tl"));
-        f5.add(new ZoneRect(50, 0, 50, 50, "tr"));
-        f5.add(new ZoneRect(0, 50, 50, 50, "bl"));
-        f5.add(new ZoneRect(50, 50, 50, 50, "br"));
+        f5.add(new ZoneRect(0, 0, 40, 40, "tl"));
+        f5.add(new ZoneRect(60, 0, 40, 40, "tr"));
+        f5.add(new ZoneRect(0, 60, 40, 40, "bl"));
+        f5.add(new ZoneRect(60, 60, 40, 40, "br"));
         f5.add(new ZoneRect(15, 15, 70, 70, "center"));
-        LAYOUT_TEMPLATES.put("4+1", f5);
+        LAYOUT_TEMPLATES.put("4p1", f5);
     }
 
     public ZoneManager(Context context, FrameLayout container) {
@@ -130,10 +131,10 @@ public class ZoneManager {
             for (int i = 0; i < zonesArray.length(); i++) {
                 JSONObject z = zonesArray.getJSONObject(i);
                 rects.add(new ZoneRect(
-                        z.getInt("x"),
-                        z.getInt("y"),
-                        z.getInt("w"),
-                        z.getInt("h"),
+                        (int) Math.round(z.getDouble("x")),
+                        (int) Math.round(z.getDouble("y")),
+                        (int) Math.round(z.getDouble("w")),
+                        (int) Math.round(z.getDouble("h")),
                         z.optString("id", "z" + i)
                 ));
             }
@@ -146,6 +147,7 @@ public class ZoneManager {
     }
 
     private void applyLayout(List<ZoneRect> rects) {
+        Log.d(TAG, "applyLayout: rects=" + rects.size());
         // 清除旧分区
         container.removeAllViews();
         zones.clear();
@@ -160,17 +162,23 @@ public class ZoneManager {
             zone.setTag("zone_" + i);
 
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(0, 0);
-            // 百分比转换为权重或具体值
-            // 使用 FrameLayout 手动布局
             container.addView(zone);
 
-            // 存储分区信息，在 onLayout 时设置位置
+            // 存储分区信息，在布局完成后设置位置
             zone.setLayoutParamsData(r.x, r.y, r.w, r.h);
 
             zones.put(i, zone);
         }
 
-        // 请求重新布局
+        // 等容器布局完成后更新分区实际位置
+        container.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override
+            public void onGlobalLayout() {
+                container.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                Log.d(TAG, "GlobalLayout触发: container=" + container.getWidth() + "x" + container.getHeight());
+                updateZonePositions(container.getWidth(), container.getHeight());
+            }
+        });
         container.requestLayout();
     }
 
@@ -178,6 +186,7 @@ public class ZoneManager {
      * 在容器布局完成后，更新各分区实际位置
      */
     public void updateZonePositions(int containerWidth, int containerHeight) {
+        Log.d(TAG, "updateZonePositions: container=" + containerWidth + "x" + containerHeight + " zones=" + zones.size());
         for (BaseZone zone : zones.values()) {
             ZoneRect r = zone.getLayoutParamsData();
             if (r != null) {
@@ -185,6 +194,8 @@ public class ZoneManager {
                 int top = containerHeight * r.y / 100;
                 int right = containerWidth * (r.x + r.w) / 100;
                 int bottom = containerHeight * (r.y + r.h) / 100;
+
+                Log.d(TAG, "  zone " + zone.getZoneId() + ": " + r.name + " rect=" + left + "," + top + "," + (right-left) + "x" + (bottom-top));
 
                 FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) zone.getLayoutParams();
                 lp.leftMargin = left;
