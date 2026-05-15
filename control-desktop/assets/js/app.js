@@ -493,6 +493,20 @@
       label.textContent = '#' + z.id;
       el.appendChild(label);
 
+      // Thumbnail for image/video/slideshow zones
+      if (z.thumbnailLocal) {
+        // Use local data URL (no TV connection needed)
+        el.style.backgroundImage = 'url(' + z.thumbnailLocal + ')';
+        el.style.backgroundSize = 'cover';
+        el.style.backgroundPosition = 'center';
+      } else if (z.type === 'video') {
+        // Video overlay icon
+        var vi = document.createElement('div');
+        vi.className = 'zone-video-indicator';
+        vi.textContent = '▶';
+        el.appendChild(vi);
+      }
+
       // Type icon
       var icon = document.createElement('span');
       icon.className = 'zone-type-icon';
@@ -500,7 +514,12 @@
         var iconsMap = { image:'🖼', video:'🎬', web:'🌐', text:'📝', slideshow:'📽', scrolltext:'📜', clock:'🕐' };
         icon.textContent = iconsMap[z.type] || '';
       }
-      el.appendChild(icon);
+      // Don't overlay icon on top of thumbnail
+      if (!z.thumbnailLocal) {
+        el.appendChild(icon);
+      } else {
+        icon.style.display = 'none';
+      }
 
       el.addEventListener('click', function () {
         selectZone(parseInt(this.dataset.zoneId, 10));
@@ -565,6 +584,65 @@
   }
 
   // ============================================================
+  // LOCAL FILE PREVIEW
+  // ============================================================
+  function setupFilePreview(inputId, zoneType) {
+    var input = $(inputId);
+    if (!input) return;
+    input.addEventListener('change', function () {
+      var zone = getSelectedZone();
+      if (!zone || !this.files || this.files.length === 0) return;
+      var file = this.files[0];
+      // Store type
+      zone.type = zoneType;
+      // Read file as data URL for preview
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        zone.thumbnailLocal = e.target.result;
+        renderPreview();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function setupSlidePreview() {
+    var input = $('slideFiles');
+    if (!input) return;
+    input.addEventListener('change', function () {
+      var zone = getSelectedZone();
+      if (!zone || !this.files || this.files.length === 0) return;
+      zone.type = 'slideshow';
+      // Use first file as preview
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        zone.thumbnailLocal = e.target.result;
+        renderPreview();
+      };
+      reader.readAsDataURL(this.files[0]);
+    });
+  }
+
+  // ============================================================
+  // UPLOAD PROGRESS BAR
+  // ============================================================
+  function showProgress(label) {
+    var bar = $('uploadProgress');
+    var labelEl = $('uploadProgressLabel');
+    if (bar) bar.style.display = 'block';
+    if (labelEl) labelEl.textContent = label || '上传中...';
+    updateProgress(0);
+  }
+  function updateProgress(pct) {
+    var bar = $('uploadProgressBar');
+    if (bar) bar.style.width = Math.min(pct, 100) + '%';
+  }
+  function hideProgress() {
+    var bar = $('uploadProgress');
+    if (bar) bar.style.display = 'none';
+    updateProgress(0);
+  }
+
+  // ============================================================
   // FILE UPLOAD TO TV
   // ============================================================
   function uploadFile(file, progressCb) {
@@ -620,19 +698,20 @@
       var fileInput = $('imgFile');
       if (fileInput && fileInput.files && fileInput.files.length > 0) {
         var file = fileInput.files[0];
-        showToast('正在上传图片...', 'info');
+        showProgress('上传图片: ' + file.name);
         uploadFile(file, function (pct) {
-          showToast('上传中 ' + pct + '%', 'info');
+          updateProgress(pct);
         }).then(function (resp) {
+          hideProgress();
           params.url = resp.url;
           params.fit = ($('imgFit') || {}).value || 'cover';
           sendContentParams(type, zone, params);
         }).catch(function (err) {
+          hideProgress();
           showToast(err, 'error');
         });
         return;
       }
-      // 没有文件但提示
       showToast('请选择要上传的图片', 'error');
       return;
     }
@@ -641,15 +720,17 @@
       var fileInput = $('videoFile');
       if (fileInput && fileInput.files && fileInput.files.length > 0) {
         var file = fileInput.files[0];
-        showToast('正在上传视频...', 'info');
+        showProgress('上传视频: ' + file.name);
         uploadFile(file, function (pct) {
-          showToast('上传中 ' + pct + '%', 'info');
+          updateProgress(pct);
         }).then(function (resp) {
+          hideProgress();
           params.url = resp.url;
           params.loop = $('videoLoop') ? $('videoLoop').checked : false;
           params.mute = $('videoMute') ? $('videoMute').checked : false;
           sendContentParams(type, zone, params);
         }).catch(function (err) {
+          hideProgress();
           showToast(err, 'error');
         });
         return;
@@ -664,25 +745,30 @@
       var files = (fileInput && fileInput.files) ? fileInput.files : [];
       if (files.length > 0) {
         var total = files.length;
-        var uploaded = 0;
         var urls = [];
-        showToast('正在上传 ' + total + ' 张图片...', 'info');
+        showProgress('上传幻灯片 (1/' + total + ')');
 
         function uploadNext(idx) {
           if (idx >= total) {
+            hideProgress();
             params.urls = urls;
             params.interval = (parseInt(($('slideInterval') || {}).value, 10) || 5) * 1000;
             sendContentParams(type, zone, params);
             return;
           }
+          $('uploadProgressLabel').textContent = '上传幻灯片 (' + (idx + 1) + '/' + total + ')';
           uploadFile(files[idx], function (pct) {
-            showToast('上传 ' + (idx + 1) + '/' + total + ' (' + pct + '%)', 'info');
+            var overall = Math.round((idx / total) * 100 + (pct / total));
+            updateProgress(overall);
           }).then(function (resp) {
             urls.push(resp.url);
+            // Save first image as thumbnail
+            if (idx === 0 && resp.url) zone.thumbnailUrl = resp.url;
+            updateProgress(Math.round(((idx + 1) / total) * 100));
             uploadNext(idx + 1);
           }).catch(function (err) {
-            showToast('第' + (idx + 1) + '张上传失败: ' + err, 'error');
-            uploadNext(idx + 1); // 跳过失败继续
+            showToast('第' + (idx + 1) + '张失败: ' + err, 'error');
+            uploadNext(idx + 1);
           });
         }
         uploadNext(0);
@@ -775,6 +861,10 @@
 
     // Update local zone state
     zone.type = type;
+    // Save thumbnail URL for preview
+    if (params.url) {
+      zone.thumbnailUrl = params.url;
+    }
 
     if (sendWS(msg)) {
       showToast('已发送到分区 #' + zone.id, 'success');
@@ -791,6 +881,8 @@
     if (!zone) { showToast('请先选择一个分区', 'error'); return; }
     if (sendWS({ type: 'clear_zone', zone_id: zone.id })) {
       zone.type = null;
+      zone.thumbnailLocal = null;
+      zone.thumbnailUrl = null;
       showToast('已清空分区 #' + zone.id, 'info');
       renderPreview();
     }
@@ -948,6 +1040,11 @@
     syncColorInput('textColor', 'textColorHex');
     syncColorInput('clockColor', 'clockColorHex');
     syncColorInput('bgColorPicker', 'bgColorHex');
+
+    // ---- File preview (select file → show thumbnail) ----
+    setupFilePreview('imgFile', 'image');
+    setupFilePreview('videoFile', 'video');
+    setupSlidePreview();
 
     // ---- Initial render ----
     selectLayout('full');
