@@ -42,6 +42,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean showingInfo = false;
     private TextView tickerText;
     private ValueAnimator tickerAnim;
+    private String scrollDirection = "left";
     private TextView clockText;
     private java.util.Timer clockTimer;
 
@@ -281,6 +282,9 @@ private void handleMessage(String message) {
         tlp.gravity = "top".equals(position) ? Gravity.TOP : Gravity.BOTTOM;
         tickerText.setLayoutParams(tlp);
 
+        // 保存方向
+        scrollDirection = direction;
+
         // LED广告屏风格：深色背景 + 边框 + 亮色文字
         tickerText.setBackgroundColor(Color.parseColor("#CC000000"));
         tickerText.setTypeface(Typeface.MONOSPACE);
@@ -323,9 +327,7 @@ private void handleMessage(String message) {
             int textW = (int) p.measureText(txt);
             if (textW <= 0) textW = txt.length() * 48; // 兜底：每字48px
 
-            Log.d(TAG, "marquee: barW=" + barW + " textW=" + textW + " txtLen=" + txt.length());
-
-            final int scrollDistance = barW + textW; // 从右侧到左侧的总行程
+            Log.d(TAG, "marquee: barW=" + barW + " textW=" + textW + " txtLen=" + txt.length() + " dir=" + scrollDirection);
 
             // 取消旧动画
             if (tickerAnim != null) {
@@ -333,12 +335,22 @@ private void handleMessage(String message) {
                 tickerAnim = null;
             }
 
-            // 复位：文字在屏幕右侧外（scrollX = textW，显示空白区域）
-            tickerText.setScrollX(textW);
+            int startX, endX;
+            if ("right".equals(scrollDirection)) {
+                // 向右：文字从左进入，向右滚动，从右侧消失
+                // scrollX 从 -barW（文字完全在左侧外）到 textW（文字完全在右侧外）
+                startX = -barW;
+                endX = textW;
+                tickerText.setScrollX(startX);
+            } else {
+                // 向左（默认）：文字从右进入，向左滚动，从左侧消失
+                // scrollX 从 textW（文字完全在右侧外）到 -barW（文字完全在左侧外）
+                startX = textW;
+                endX = -barW;
+                tickerText.setScrollX(startX);
+            }
 
-            // 用 ValueAnimator 手动控制 scrollX，从 textW 逐渐减到 -barW
-            // 这样文字从右侧进入 → 完整经过屏幕 → 从左侧消失
-            ValueAnimator anim = ValueAnimator.ofInt(textW, -barW);
+            ValueAnimator anim = ValueAnimator.ofInt(startX, endX);
             anim.setDuration(Math.max(5000, txt.length() * 300L)); // 每字300ms
             anim.setInterpolator(null); // 匀速
             anim.setRepeatCount(ValueAnimator.INFINITE);
