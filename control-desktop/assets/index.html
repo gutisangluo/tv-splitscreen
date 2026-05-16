@@ -161,8 +161,6 @@
       <button class="type-tab" data-type="web">网页</button>
       <button class="type-tab" data-type="text">文字</button>
       <button class="type-tab" data-type="slideshow">幻灯片</button>
-      <button class="type-tab" data-type="scrolltext">滚动文字</button>
-      <button class="type-tab" data-type="clock">时钟</button>
     </div>
 
     <!-- === IMAGE === -->
@@ -195,12 +193,12 @@
       <div class="form-row">
         <div class="form-group" style="flex:1">
           <label>
-            <input type="checkbox" id="videoLoop"> 循环播放
+            <input type="checkbox" id="videoLoop" checked> 循环播放
           </label>
         </div>
         <div class="form-group" style="flex:1">
           <label>
-            <input type="checkbox" id="videoMute" checked> 静音
+            <input type="checkbox" id="videoMute"> 静音
           </label>
         </div>
       </div>
@@ -272,73 +270,93 @@
         <button class="btn btn-primary btn-sm" id="slideApply"><span class="upload-icon">📤</span> 上传并应用</button>
       </div>
     </div>
+  </section>
 
-    <!-- === SCROLL TEXT === -->
-    <div class="content-form" id="form-scrolltext">
+  <!-- ======== GLOBAL TOOLS ======== -->
+  <section class="global-tools" id="globalTools">
+    <div class="section-title">全局工具</div>
+
+    <!-- Scroll text -->
+    <div class="global-tool-item">
+      <div class="global-tool-header">
+        <span class="global-tool-icon">📜</span>
+        <span class="global-tool-name">滚动文字</span>
+      </div>
       <div class="form-group">
-        <label>滚动文字</label>
-        <textarea id="scrollContent" placeholder="请输入要滚动的文字..." rows="3"></textarea>
+        <textarea id="scrollContent" placeholder="请输入要滚动的文字..." rows="2"></textarea>
       </div>
       <div class="form-row">
-        <div class="form-group">
+        <div class="form-group" style="flex:1">
           <label>速度</label>
-          <select id="scrollSpeed">
-            <option value="slow">慢速</option>
-            <option value="normal" selected>中速</option>
-            <option value="fast">快速</option>
+          <select id="scrollSpeed" class="input-sm">
+            <option value="slow">慢</option>
+            <option value="normal" selected>中</option>
+            <option value="fast">快</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="flex:1">
           <label>位置</label>
-          <select id="scrollPosition">
-            <option value="top" selected>屏幕顶部</option>
-            <option value="bottom">屏幕底部</option>
+          <select id="scrollPosition" class="input-sm">
+            <option value="top">顶部</option>
+            <option value="bottom" selected>底部</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="flex:1">
           <label>方向</label>
-          <select id="scrollDirection">
+          <select id="scrollDirection" class="input-sm">
             <option value="left">向左</option>
             <option value="right" selected>向右</option>
-            <option value="up">向上</option>
-            <option value="down">向下</option>
           </select>
         </div>
       </div>
-      <div class="form-actions">
-        <button class="btn btn-primary btn-sm" id="scrollApply">应用到分区</button>
+      <div class="form-actions" style="margin-top:0">
+        <button class="btn btn-primary btn-sm" id="scrollApply">发送滚动文字</button>
       </div>
     </div>
 
-    <!-- === CLOCK === -->
-    <div class="content-form" id="form-clock">
-      <div class="form-group">
-        <label>时间格式</label>
-        <select id="clockFormat">
-          <option value="HH:mm:ss">HH:mm:ss</option>
-          <option value="HH:mm">HH:mm</option>
-          <option value="yyyy-MM-dd HH:mm:ss">yyyy-MM-dd HH:mm:ss</option>
-          <option value="yyyy-MM-dd HH:mm">yyyy-MM-dd HH:mm</option>
-          <option value="MM/dd HH:mm">MM/dd HH:mm</option>
-          <option value="HH:mm:ss (EEE)">HH:mm:ss (周X)</option>
-          <option value="yyyy年MM月dd日 HH:mm">yyyy年MM月dd日 HH:mm</option>
-        </select>
+    <!-- Clock -->
+    <div class="global-tool-item" style="margin-top:12px">
+      <div class="global-tool-header">
+        <span class="global-tool-icon">🕐</span>
+        <span class="global-tool-name">时钟</span>
       </div>
       <div class="form-row">
-        <div class="form-group">
-          <label>字号(px)</label>
-          <input type="number" id="clockSize" value="64" min="12" max="300" step="4">
+        <div class="form-group" style="flex:2">
+          <label>时间格式</label>
+          <select id="clockFormat" class="input-sm">
+            <option value="HH:mm:ss">HH:mm:ss</option>
+            <option value="HH:mm" selected>HH:mm</option>
+            <option value="yyyy-MM-dd HH:mm:ss">完整日期+时间</option>
+            <option value="HH:mm:ss (EEE)">HH:mm:ss(周X)</option>
+            <option value="yyyy年MM月dd日 HH:mm">中文日期</option>
+          </select>
         </div>
-        <div class="form-group">
+        <div class="form-group" style="flex:1">
+          <label>字号</label>
+          <input type="number" id="clockSize" value="12" min="8" max="300" step="2" class="input-sm" style="width:100%">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
           <label>颜色</label>
           <div class="color-input-row">
             <input type="color" id="clockColor" value="#ffffff">
-            <input type="text" id="clockColorHex" value="#ffffff" placeholder="#ffffff">
+            <input type="text" id="clockColorHex" value="#ffffff" placeholder="#ffffff" class="input-sm">
           </div>
         </div>
+        <div class="form-group" style="flex:1">
+          <label>位置</label>
+          <select id="clockPosition" class="input-sm">
+            <option value="top-left">左上</option>
+            <option value="top-right" selected>右上</option>
+            <option value="bottom-left">左下</option>
+            <option value="bottom-right">右下</option>
+          </select>
+        </div>
       </div>
-      <div class="form-actions">
-        <button class="btn btn-primary btn-sm" id="clockApply">应用到分区</button>
+      <div class="form-actions" style="margin-top:0">
+        <button class="btn btn-primary btn-sm" id="clockApply">显示时钟</button>
+        <button class="btn btn-sm" id="clockHide" style="margin-left:8px">隐藏</button>
       </div>
     </div>
   </section>

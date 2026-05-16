@@ -721,3 +721,33 @@ body {
 ::-webkit-scrollbar-track { background: var(--bg-primary); }
 ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ---- Global Tools ---- */
+.global-tools {
+  margin-top: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+.global-tool-item {
+  background: var(--bg-primary);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+.global-tool-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.global-tool-icon { font-size: 1.1rem; }
+.global-tool-name { color: var(--text-primary); }
+.global-tools .form-group { margin-bottom: 6px; }
+.global-tools label { font-size: 0.72rem; margin-bottom: 2px; }
+.global-tools .form-row { gap: 6px; }
+.global-tools textarea { font-size: 0.82rem; }
+.global-tools .form-actions { margin-top: 6px; }
+.input-sm { font-size: 0.8rem; padding: 4px 6px; }

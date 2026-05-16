@@ -151,6 +151,9 @@ public class BaseZone extends FrameLayout {
 
             exoPlayer = new ExoPlayer.Builder(getContext())
                     .setHandleAudioBecomingNoisy(true)
+                    .setRenderersFactory(new androidx.media3.exoplayer.DefaultRenderersFactory(getContext())
+                            .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+                            .setEnableDecoderFallback(true))
                     .build();
             exoPlayer.setRepeatMode(loop ? Player.REPEAT_MODE_ALL : Player.REPEAT_MODE_OFF);
             exoPlayer.setVolume(mute ? 0f : 1f);
@@ -162,8 +165,9 @@ public class BaseZone extends FrameLayout {
 
             playerView.setPlayer(exoPlayer);
             addView(playerView);
+            Log.d(TAG, "视频已开始播放: " + fullUrl);
         } catch (Exception e) {
-            Log.e(TAG, "视频播放失败: " + e.getMessage());
+            Log.e(TAG, "视频播放失败: " + fullUrl + " error=" + e.getMessage(), e);
             // 回退：显示文字提示
             showText("视频加载失败", "#FF6666", 16, "center");
         }

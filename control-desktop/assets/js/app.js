@@ -81,8 +81,6 @@
     web: { apply: 'webApply', fields: ['webUrl', 'webHtml'] },
     text: { apply: 'textApply', fields: ['textContent', 'textSize', 'textAlign', 'textColor', 'textColorHex'] },
     slideshow: { apply: 'slideApply', fields: ['slideFiles', 'slideInterval'] },
-    scrolltext: { apply: 'scrollApply', fields: ['scrollContent', 'scrollSpeed', 'scrollDirection', 'scrollPosition'] },
-    clock: { apply: 'clockApply', fields: ['clockFormat', 'clockSize', 'clockColor', 'clockColorHex'] },
   };
 
   // ============================================================
@@ -511,7 +509,7 @@
       var icon = document.createElement('span');
       icon.className = 'zone-type-icon';
       if (z.type) {
-        var iconsMap = { image:'🖼', video:'🎬', web:'🌐', text:'📝', slideshow:'📽', scrolltext:'📜', clock:'🕐' };
+        var iconsMap = { image:'🖼', video:'🎬', web:'🌐', text:'📝', slideshow:'📽' };
         icon.textContent = iconsMap[z.type] || '';
       }
       // Don't overlay icon on top of thumbnail
@@ -653,7 +651,7 @@
       var url = 'http://' + ip + ':' + port + '/upload';
 
       var formData = new FormData();
-      formData.append('file', file);
+      formData.append(file.name, file);
 
       var xhr = new XMLHttpRequest();
       xhr.open('POST', url, true);
@@ -816,17 +814,6 @@
       delete params.textAlign;
     }
 
-    if (type === 'clock') {
-      var ccHex = $('clockColorHex').value.trim();
-      params.color = ccHex || '#ffffff';
-      params.size = parseInt($('clockSize').value, 10) || 64;
-      params.format = $('clockFormat').value;
-      delete params.clockColor;
-      delete params.clockColorHex;
-      delete params.clockSize;
-      delete params.clockFormat;
-    }
-
     if (type === 'web') {
       var url = $('webUrl').value.trim();
       var html = $('webHtml').value.trim();
@@ -835,20 +822,6 @@
       delete params.webUrl;
       delete params.webHtml;
     }
-
-    if (type === 'scrolltext') {
-      if (!params.scrollContent) { showToast('请输入滚动文字', 'error'); return; }
-      params.text = params.scrollContent;
-      params.speed = params.scrollSpeed;
-      params.direction = params.scrollDirection;
-      params.position = params.scrollPosition || 'top';
-      delete params.scrollContent;
-      delete params.scrollSpeed;
-      delete params.scrollDirection;
-      delete params.scrollPosition;
-    }
-
-    // Send non-file type content
     sendContentParams(type, zone, params);
   }
 
@@ -1043,6 +1016,50 @@
     // ---- Background color ----
     DOM.btnSetBg.addEventListener('click', openBgModal);
     DOM.bgApply.addEventListener('click', applyBgColor);
+
+    // ---- Global tool: Scroll text ----
+    $('scrollApply').addEventListener('click', function () {
+      var text = $('scrollContent').value.trim();
+      if (!text) { showToast('请输入滚动文字', 'error'); return; }
+      sendWS({
+        type: 'set_content',
+        content_type: 'scroll',
+        zone_id: 0,
+        params: {
+          text: text,
+          direction: $('scrollDirection').value,
+          position: $('scrollPosition').value
+        }
+      });
+      showToast('滚动文字已发送', 'success');
+    });
+
+    // ---- Global tool: Clock ----
+    $('clockApply').addEventListener('click', function () {
+      var hex = $('clockColorHex').value.trim();
+      sendWS({
+        type: 'set_content',
+        content_type: 'clock',
+        zone_id: 0,
+        params: {
+          format: $('clockFormat').value,
+          size: parseInt($('clockSize').value, 10) || 64,
+          color: hex || '#ffffff',
+          position: $('clockPosition').value
+        }
+      });
+      showToast('时钟已发送', 'success');
+    });
+
+    $('clockHide').addEventListener('click', function () {
+      sendWS({
+        type: 'set_content',
+        content_type: 'clock',
+        zone_id: 0,
+        params: { hide: true }
+      });
+      showToast('时钟已隐藏', 'success');
+    });
 
     // Color sync
     syncColorInput('textColor', 'textColorHex');

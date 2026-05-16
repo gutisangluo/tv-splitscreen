@@ -97,16 +97,31 @@ public class FileServer extends NanoHTTPD {
             }
 
             // 读取原始文件名
-            // NanoHTTPD 的头里有 Content-Disposition 中的原始文件名
+            // 优先：JS 上传时以文件名作为 form field name
             String originalName = fileName;
-            String contentDisposition = session.getHeaders().get("content-disposition");
-            if (contentDisposition != null) {
-                // 解析 filename="xxx"
-                int idx = contentDisposition.indexOf("filename=\"");
-                if (idx > 0) {
-                    int end = contentDisposition.indexOf("\"", idx + 10);
-                    if (end > idx + 10) {
-                        originalName = contentDisposition.substring(idx + 10, end);
+            // 后备：从 Content-Disposition 解析原始文件名
+            // 注意：NanoHTTPD 的 multipart 部分 Content-Disposition 头
+            // 可能在 session.getHeaders() 中，也可能在 parseBody 的临时文件元数据中
+            for (Map.Entry<String, String> hdr : session.getHeaders().entrySet()) {
+                String key = hdr.getKey().toLowerCase();
+                if (key.contains("content-disposition") || key.equals("content-disposition")) {
+                    String val = hdr.getValue();
+                    int idx = val.indexOf("filename=\"");
+                    if (idx > 0) {
+                        int end = val.indexOf("\"", idx + 10);
+                        if (end > idx + 10) {
+                            originalName = val.substring(idx + 10, end);
+                        }
+                    }
+                }
+            }
+            // 如果还是没拿到扩展名，尝试从临时文件路径推断
+            if (!originalName.contains(".")) {
+                String tmpLower = filePath.toLowerCase();
+                for (String knownExt : new String[]{".mp4",".avi",".mkv",".mov",".jpg",".jpeg",".png",".gif",".webp"}) {
+                    if (tmpLower.contains(knownExt)) {
+                        originalName = "file" + knownExt;
+                        break;
                     }
                 }
             }

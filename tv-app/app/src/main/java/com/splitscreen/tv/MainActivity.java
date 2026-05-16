@@ -41,7 +41,9 @@ public class MainActivity extends AppCompatActivity {
     private Handler mainHandler;
     private boolean showingInfo = false;
     private TextView tickerText;
-    private ObjectAnimator tickerAnim;
+    private ValueAnimator tickerAnim;
+    private TextView clockText;
+    private java.util.Timer clockTimer;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,10 +98,11 @@ public class MainActivity extends AppCompatActivity {
         showConnectionInfo("IP: " + ip + ":" + WS_PORT + " 等待连接...", false);
         Log.d(TAG, "电视端已启动, IP: " + ip + " 端口: " + WS_PORT);
 
-        // 创建屏幕顶部/底部滚动文字条（初始隐藏）
+        // 创建屏幕滚动文字条（初始隐藏、LED广告屏风格）
         tickerText = new TextView(this);
-        tickerText.setTextColor(Color.WHITE);
-        tickerText.setTypeface(Typeface.DEFAULT_BOLD);
+        tickerText.setTextColor(Color.parseColor("#00FF88"));
+        tickerText.setTypeface(Typeface.MONOSPACE);
+        tickerText.setShadowLayer(8, 0, 0, Color.parseColor("#00FF88"));
         tickerText.setTextSize(16);
         tickerText.setPadding(20, 8, 20, 8);
         tickerText.setSingleLine(true);
@@ -112,6 +115,20 @@ public class MainActivity extends AppCompatActivity {
         tickerText.setLayoutParams(tlp);
         tickerText.setBackgroundColor(Color.parseColor("#88000000"));
         container.addView(tickerText);
+
+        // 创建时钟覆盖层（初始隐藏）
+        clockText = new TextView(this);
+        clockText.setTextColor(Color.WHITE);
+        clockText.setTextSize(12);
+        clockText.setGravity(Gravity.CENTER);
+        clockText.setVisibility(View.GONE);
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        clp.gravity = Gravity.TOP | Gravity.RIGHT;
+        clp.setMargins(16, 16, 16, 16);
+        clockText.setLayoutParams(clp);
+        container.addView(clockText);
     }
 
     private void initWebSocket() {
@@ -176,11 +193,22 @@ private void handleMessage(String message) {
                     String contentType = msg.getString("content_type");
                     JSONObject params = msg.getJSONObject("params");
 
-                    // 滚动文字：显示在屏幕底部跑马灯条，不在分区内
+                    // 滚动文字：独立于分区，显示在屏幕顶部/底部
                     if ("scroll".equals(contentType) || "scrolltext".equals(contentType)) {
                         String scrollText = params.optString("text", "");
                         String direction = params.optString("direction", "left");
-                        showTicker(scrollText, direction);
+                        String position = params.optString("position", "bottom");
+                        showTicker(scrollText, direction, position);
+                        break;
+                    }
+
+                    // 时钟：屏幕级覆盖层，不在分区内
+                    if ("clock".equals(contentType)) {
+                        if (params.optBoolean("hide", false)) {
+                            hideClock();
+                        } else {
+                            showClock(params);
+                        }
                         break;
                     }
 
@@ -231,8 +259,8 @@ private void handleMessage(String message) {
         }
     }
 
-    /** 显示屏幕底部滚动文字条 */
-    private void showTicker(String text, String direction) {
+    /** 显示屏幕顶部/底部滚动文字条（LED广告屏效果） */
+    private void showTicker(String text, String direction, String position) {
         if (tickerText == null) return;
 
         // 取消旧动画
@@ -248,55 +276,152 @@ private void handleMessage(String message) {
             container.addView(tickerText);
         }
 
-        // 固定在底部
+        // 顶部或底部
         FrameLayout.LayoutParams tlp = (FrameLayout.LayoutParams) tickerText.getLayoutParams();
-        tlp.gravity = Gravity.BOTTOM;
+        tlp.gravity = "top".equals(position) ? Gravity.TOP : Gravity.BOTTOM;
         tickerText.setLayoutParams(tlp);
 
-        tickerText.setBackgroundColor(Color.parseColor("#88000000"));
+        // LED广告屏风格：深色背景 + 边框 + 亮色文字
+        tickerText.setBackgroundColor(Color.parseColor("#CC000000"));
+        tickerText.setTypeface(Typeface.MONOSPACE);
+        tickerText.setTextColor(Color.parseColor("#00FF88"));
+        tickerText.setShadowLayer(8, 0, 0, Color.parseColor("#00FF88")); // 发光效果
+        tickerText.setPadding(30, 10, 30, 10);
         tickerText.setText(text);
         tickerText.setVisibility(View.VISIBLE);
 
         tickerText.postDelayed(() -> {
-            // 等布局完成获取宽度
             final int barW = tickerText.getWidth();
             if (barW <= 0) {
-                tickerText.post(() -> startTickerAnim(direction));
+                tickerText.post(() -> startMarquee());
             } else {
-                startTickerAnim(direction);
+                startMarquee();
             }
         }, 100);
     }
 
-    private void startTickerAnim(String direction) {
-        // 统一用水平跑马灯，文字从右到左滚动显示全部内容
-        startMarquee();
-    }
-
     private void startMarquee() {
+        final String txt = tickerText.getText().toString();
+        if (txt.isEmpty()) return;
+
         tickerText.setSingleLine(true);
         tickerText.setHorizontallyScrolling(true);
         tickerText.setVisibility(View.VISIBLE);
 
+        // 等一次布局完成
         tickerText.post(() -> {
-            int w = tickerText.getWidth();
-            String txt = tickerText.getText().toString();
-            // 用 Paint 准确测量文字像素宽度
-            int tw = (int) tickerText.getPaint().measureText(txt);
-            if (tw <= 0) tw = txt.length() * 50;
+            final int barW = tickerText.getWidth();
+            if (barW <= 0) {
+                tickerText.post(this::startMarquee);
+                return;
+            }
 
-            // 从屏幕右侧(w)滚动到全部文字离开左侧(-tw)
-            // 确保30个字全部按顺序出现
-            ObjectAnimator anim = ObjectAnimator.ofFloat(tickerText, "translationX",
-                    (float) w, (float) -tw);
-            // 速度按每秒显示约8个字：duration = 字数 × 1000 / 8
-            long duration = Math.max(2000, txt.length() * 125L);
-            anim.setDuration(duration);
+            // 用 Paint 准确测量文字像素宽度（和 TextView 保持一致）
+            android.graphics.Paint p = new android.graphics.Paint();
+            p.setTypeface(tickerText.getTypeface());
+            p.setTextSize(tickerText.getTextSize());
+            int textW = (int) p.measureText(txt);
+            if (textW <= 0) textW = txt.length() * 48; // 兜底：每字48px
+
+            Log.d(TAG, "marquee: barW=" + barW + " textW=" + textW + " txtLen=" + txt.length());
+
+            final int scrollDistance = barW + textW; // 从右侧到左侧的总行程
+
+            // 取消旧动画
+            if (tickerAnim != null) {
+                tickerAnim.cancel();
+                tickerAnim = null;
+            }
+
+            // 复位：文字在屏幕右侧外（scrollX = textW，显示空白区域）
+            tickerText.setScrollX(textW);
+
+            // 用 ValueAnimator 手动控制 scrollX，从 textW 逐渐减到 -barW
+            // 这样文字从右侧进入 → 完整经过屏幕 → 从左侧消失
+            ValueAnimator anim = ValueAnimator.ofInt(textW, -barW);
+            anim.setDuration(Math.max(5000, txt.length() * 300L)); // 每字300ms
+            anim.setInterpolator(null); // 匀速
             anim.setRepeatCount(ValueAnimator.INFINITE);
             anim.setRepeatMode(ValueAnimator.RESTART);
+            anim.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                @Override
+                public void onAnimationUpdate(ValueAnimator animation) {
+                    tickerText.setScrollX((Integer) animation.getAnimatedValue());
+                    tickerText.invalidate();
+                }
+            });
             anim.start();
             tickerAnim = anim;
         });
+    }
+
+    /** 显示屏幕级时钟 */
+    private void showClock(JSONObject params) {
+        if (clockText == null) return;
+
+        // 取消旧定时器
+        if (clockTimer != null) {
+            clockTimer.cancel();
+            clockTimer = null;
+        }
+
+        // 如果被 removeAllViews 清掉了，重新添加
+        if (clockText.getParent() == null) {
+            container.addView(clockText);
+        }
+
+        // 格式
+        String format = params.optString("format", "HH:mm:ss");
+        int size = params.optInt("size", 12);
+        String colorStr = params.optString("color", "#ffffff");
+        String position = params.optString("position", "top-right");
+
+        // 字号
+        clockText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, size * getResources().getDisplayMetrics().density);
+
+        // 颜色
+        try {
+            clockText.setTextColor(Color.parseColor(colorStr));
+        } catch (Exception e) {
+            clockText.setTextColor(Color.WHITE);
+        }
+
+        // 位置
+        FrameLayout.LayoutParams clp = (FrameLayout.LayoutParams) clockText.getLayoutParams();
+        switch (position) {
+            case "top-left": clp.gravity = Gravity.TOP | Gravity.LEFT; break;
+            case "top-right": clp.gravity = Gravity.TOP | Gravity.RIGHT; break;
+            case "bottom-left": clp.gravity = Gravity.BOTTOM | Gravity.LEFT; break;
+            case "bottom-right": clp.gravity = Gravity.BOTTOM | Gravity.RIGHT; break;
+            default: clp.gravity = Gravity.TOP | Gravity.RIGHT;
+        }
+        clp.setMargins(16, 16, 16, 16);
+        clockText.setLayoutParams(clp);
+
+        clockText.setVisibility(View.VISIBLE);
+        clockText.bringToFront();
+
+        // 定时更新
+        final java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat(format, java.util.Locale.getDefault());
+        clockTimer = new java.util.Timer();
+        clockTimer.scheduleAtFixedRate(new java.util.TimerTask() {
+            @Override
+            public void run() {
+                final String timeStr = sdf.format(new java.util.Date());
+                clockText.post(() -> clockText.setText(timeStr));
+            }
+        }, 0, 1000); // 每秒更新
+    }
+
+    /** 隐藏时钟 */
+    private void hideClock() {
+        if (clockTimer != null) {
+            clockTimer.cancel();
+            clockTimer = null;
+        }
+        if (clockText != null) {
+            clockText.setVisibility(View.GONE);
+        }
     }
 
     private void showConnectionInfo(String text, boolean persistent) {
