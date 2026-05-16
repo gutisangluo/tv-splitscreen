@@ -37,13 +37,9 @@ dependencies {
     // WebSocket
     implementation("org.java-websocket:Java-WebSocket:1.5.4")
 
-    // ExoPlayer for video zones
-    implementation("androidx.media3:media3-exoplayer:1.2.0")
-    implementation("androidx.media3:media3-ui:1.2.0")
-
-    // Image loading
+    // Glide for image loading
     implementation("com.github.bumptech.glide:glide:4.16.0")
-
+    annotationProcessor("com.github.bumptech.glide:compiler:4.16.0")
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
 

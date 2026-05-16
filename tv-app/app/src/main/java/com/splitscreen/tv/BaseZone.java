@@ -7,10 +7,12 @@ import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebView;
@@ -21,11 +23,6 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.media3.common.MediaItem;
-import androidx.media3.common.Player;
-import androidx.media3.exoplayer.ExoPlayer;
-import androidx.media3.ui.AspectRatioFrameLayout;
-import androidx.media3.ui.PlayerView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions;
@@ -49,8 +46,8 @@ public class BaseZone extends FrameLayout {
 
     // 内容视图
     private ImageView imageView;
-    private PlayerView playerView;
-    private ExoPlayer exoPlayer;
+    private SurfaceView surfaceView;
+    private MediaPlayer mediaPlayer;
     private WebView webView;
     private TextView textView;
     private LinearLayout slideContainer;
@@ -137,38 +134,62 @@ public class BaseZone extends FrameLayout {
         contentType = "video";
 
         // 相对路径补全
-        String fullUrl = url;
+        final String finalUrl;
         if (url != null && url.startsWith("/")) {
-            fullUrl = "http://127.0.0.1:9528" + url;
+            finalUrl = "http://127.0.0.1:9528" + url;
+        } else {
+            finalUrl = url;
         }
+        final boolean finalLoop = loop;
+        final boolean finalMute = mute;
 
         try {
-            playerView = new PlayerView(getContext());
-            playerView.setLayoutParams(new LayoutParams(
+            // 用 SurfaceView 配合系统 MediaPlayer
+            surfaceView = new SurfaceView(getContext());
+            surfaceView.setLayoutParams(new LayoutParams(
                     LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-            playerView.setUseController(false);
-            playerView.setResizeMode(AspectRatioFrameLayout.RESIZE_MODE_FILL);
 
-            exoPlayer = new ExoPlayer.Builder(getContext())
-                    .setHandleAudioBecomingNoisy(true)
-                    .setRenderersFactory(new androidx.media3.exoplayer.DefaultRenderersFactory(getContext())
-                            .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
-                            .setEnableDecoderFallback(true))
-                    .build();
-            exoPlayer.setRepeatMode(loop ? Player.REPEAT_MODE_ALL : Player.REPEAT_MODE_OFF);
-            exoPlayer.setVolume(mute ? 0f : 1f);
+            mediaPlayer = new MediaPlayer();
+            mediaPlayer.setLooping(loop);
+            mediaPlayer.setVolume(mute ? 0f : 1f, mute ? 0f : 1f);
 
-            MediaItem mediaItem = MediaItem.fromUri(fullUrl);
-            exoPlayer.setMediaItem(mediaItem);
-            exoPlayer.prepare();
-            exoPlayer.play();
+            // 等 Surface 创建完成再设置数据源并播放
+            surfaceView.getHolder().addCallback(new android.view.SurfaceHolder.Callback() {
+                @Override
+                public void surfaceCreated(android.view.SurfaceHolder holder) {
+                    try {
+                        mediaPlayer.setSurface(holder.getSurface());
+                        mediaPlayer.setDataSource(finalUrl);
+                        mediaPlayer.setOnPreparedListener(mp -> {
+                            mp.start();
+                            Log.d(TAG, "视频已开始播放(系统MediaPlayer): " + finalUrl);
+                        });
+                        mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                            Log.e(TAG, "视频播放错误: what=" + what + " extra=" + extra);
+                            showText("视频加载失败", "#FF6666", 16, "center");
+                            return true;
+                        });
+                        mediaPlayer.prepareAsync();
+                    } catch (Exception e) {
+                        Log.e(TAG, "视频初始化失败: " + e.getMessage(), e);
+                        showText("视频加载失败", "#FF6666", 16, "center");
+                    }
+                }
 
-            playerView.setPlayer(exoPlayer);
-            addView(playerView);
-            Log.d(TAG, "视频已开始播放: " + fullUrl);
+                @Override
+                public void surfaceChanged(android.view.SurfaceHolder holder, int format, int width, int height) {}
+
+                @Override
+                public void surfaceDestroyed(android.view.SurfaceHolder holder) {
+                    if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                        mediaPlayer.pause();
+                    }
+                }
+            });
+
+            addView(surfaceView);
         } catch (Exception e) {
-            Log.e(TAG, "视频播放失败: " + fullUrl + " error=" + e.getMessage(), e);
-            // 回退：显示文字提示
+            Log.e(TAG, "视频播放失败: " + finalUrl + " error=" + e.getMessage(), e);
             showText("视频加载失败", "#FF6666", 16, "center");
         }
     }
@@ -418,11 +439,13 @@ public class BaseZone extends FrameLayout {
             clockHandler = null;
         }
 
-        // 释放 ExoPlayer
-        if (exoPlayer != null) {
-            exoPlayer.stop();
-            exoPlayer.release();
-            exoPlayer = null;
+        // 释放系统 MediaPlayer
+        if (mediaPlayer != null) {
+            try {
+                mediaPlayer.stop();
+                mediaPlayer.release();
+            } catch (Exception ignored) {}
+            mediaPlayer = null;
         }
 
         // 清除 WebView
@@ -435,7 +458,7 @@ public class BaseZone extends FrameLayout {
         // 移除所有子视图
         removeAllViews();
         imageView = null;
-        playerView = null;
+        surfaceView = null;
         textView = null;
         slideContainer = null;
     }

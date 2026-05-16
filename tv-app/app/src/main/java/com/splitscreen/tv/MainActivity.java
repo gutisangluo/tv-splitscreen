@@ -336,15 +336,13 @@ private void handleMessage(String message) {
             }
 
             int startX, endX;
-            if ("right".equals(scrollDirection)) {
-                // 向右：文字从左进入，向右滚动，从右侧消失
-                // scrollX 从 -barW（文字完全在左侧外）到 textW（文字完全在右侧外）
+            if ("left".equals(scrollDirection)) {
+                // 向左：scrollX 增大，内容左移，文字从右进左出
                 startX = -barW;
                 endX = textW;
                 tickerText.setScrollX(startX);
             } else {
-                // 向左（默认）：文字从右进入，向左滚动，从左侧消失
-                // scrollX 从 textW（文字完全在右侧外）到 -barW（文字完全在左侧外）
+                // 向右：scrollX 减小，内容右移，文字从左进右出
                 startX = textW;
                 endX = -barW;
                 tickerText.setScrollX(startX);
