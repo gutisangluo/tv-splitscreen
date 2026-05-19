@@ -161,6 +161,8 @@
       <button class="type-tab" data-type="web">网页</button>
       <button class="type-tab" data-type="text">文字</button>
       <button class="type-tab" data-type="slideshow">幻灯片</button>
+      <button class="type-tab" data-type="screencast">📺 投屏</button>
+      <button class="type-tab" data-type="groupchat">💬 群聊</button>
     </div>
 
     <!-- === IMAGE === -->
@@ -266,11 +268,71 @@
         <label>切换间隔（秒）</label>
         <input type="number" id="slideInterval" value="5" min="1" max="999" step="1">
       </div>
+      <div class="form-group">
+        <label>显示模式</label>
+        <select id="slideFit">
+          <option value="cover">裁剪填充</option>
+          <option value="contain">完整显示</option>
+          <option value="fill">拉伸填充</option>
+        </select>
+      </div>
       <div class="form-actions">
         <button class="btn btn-primary btn-sm" id="slideApply"><span class="upload-icon">📤</span> 上传并应用</button>
       </div>
     </div>
+
+    <!-- === SCREENCAST === -->
+    <div class="content-form" id="form-screencast">
+      <div class="form-group">
+        <div id="castStatus" style="color:var(--text-muted);font-size:0.78rem;text-align:center;padding:8px;background:var(--bg-card);border-radius:8px;">
+          📺 投屏未启动
+        </div>
+      </div>
+      <div class="form-group">
+        <label>显示模式</label>
+        <select id="castFit">
+          <option value="contain">完整显示（保持比例）</option>
+          <option value="cover">裁剪填充</option>
+          <option value="fill">拉伸填充</option>
+        </select>
+      </div>
+      <div class="form-actions" style="display:flex;gap:8px;">
+        <button class="btn btn-primary btn-sm" id="castStart" style="flex:2">▶ 开始投屏</button>
+        <button class="btn btn-sm" id="castStop" style="flex:1;background:var(--danger);color:white;" disabled>■ 停止</button>
+      </div>
+      <div style="margin-top:8px;font-size:0.72rem;color:var(--text-muted);text-align:center;">
+        点击「开始投屏」后选择要投屏的窗口或整个屏幕
+      </div>
+    </div>
   </section>
+
+    <!-- === GROUPCHAT === -->
+    <div class="content-form" id="form-groupchat">
+      <div class="form-group">
+        <label>消息发送者</label>
+        <input type="text" id="groupChatSender" placeholder="显示为谁发的" value="群友">
+      </div>
+      <div class="form-group">
+        <label>输入消息</label>
+        <textarea id="groupChatInput" placeholder="输入要发送到电视的消息..." rows="3"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" id="groupChatSend"><span class="upload-icon">📤</span> 发送到电视</button>
+      </div>
+      <div class="form-group">
+        <div id="groupChatStatus" style="color:var(--text-muted);font-size:0.78rem;text-align:center;padding:8px;background:var(--bg-card);border-radius:8px;">
+          💬 消息将循环显示在电视分区上
+        </div>
+      </div>
+      <div class="form-actions" style="display:flex;gap:8px;">
+        <button class="btn btn-primary btn-sm" id="groupChatStart" style="flex:2">▶ 启动显示</button>
+        <button class="btn btn-sm" id="groupChatStop" style="flex:1;background:var(--danger);color:white;" disabled>■ 停止</button>
+        <button class="btn btn-sm" id="groupChatClear" style="flex:1;background:var(--bg-card);color:var(--text-muted);">🗑 清空</button>
+      </div>
+      <div style="margin-top:8px;font-size:0.72rem;color:var(--text-muted);text-align:center;">
+        发到电视的消息会按时间顺序循环轮播显示
+      </div>
+    </div>
 
   <!-- ======== GLOBAL TOOLS ======== -->
   <section class="global-tools" id="globalTools">
@@ -307,6 +369,10 @@
             <option value="left">向左</option>
             <option value="right" selected>向右</option>
           </select>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>字号(px)</label>
+          <input type="number" id="scrollSize" value="16" min="10" max="80" step="2" class="input-sm">
         </div>
       </div>
       <div class="form-actions" style="margin-top:0">

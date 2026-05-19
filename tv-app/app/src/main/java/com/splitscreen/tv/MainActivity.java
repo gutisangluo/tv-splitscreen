@@ -61,6 +61,9 @@ public class MainActivity extends AppCompatActivity {
                         | View.SYSTEM_UI_FLAG_FULLSCREEN
                         | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
+        // 防止电视进入屏保
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+
         // UI 初始化
         container = new FrameLayout(this);
         container.setBackgroundColor(Color.BLACK);
@@ -199,7 +202,8 @@ private void handleMessage(String message) {
                         String scrollText = params.optString("text", "");
                         String direction = params.optString("direction", "left");
                         String position = params.optString("position", "bottom");
-                        showTicker(scrollText, direction, position);
+                        int fontSize = params.optInt("fontSize", 16);
+                        showTicker(scrollText, direction, position, fontSize);
                         break;
                     }
 
@@ -261,7 +265,7 @@ private void handleMessage(String message) {
     }
 
     /** 显示屏幕顶部/底部滚动文字条（LED广告屏效果） */
-    private void showTicker(String text, String direction, String position) {
+    private void showTicker(String text, String direction, String position, int fontSize) {
         if (tickerText == null) return;
 
         // 取消旧动画
@@ -291,6 +295,7 @@ private void handleMessage(String message) {
         tickerText.setTextColor(Color.parseColor("#00FF88"));
         tickerText.setShadowLayer(8, 0, 0, Color.parseColor("#00FF88")); // 发光效果
         tickerText.setPadding(30, 10, 30, 10);
+        tickerText.setTextSize(fontSize);
         tickerText.setText(text);
         tickerText.setVisibility(View.VISIBLE);
 
@@ -483,8 +488,10 @@ private void handleMessage(String message) {
     }
 
     private String getLocalIpAddress() {
-        // 遍历所有网络接口，找到第一个非 loopback 的 IPv4 地址
+        // 收集所有非 loopback 的 IPv4 地址，逗号分隔显示
+        // 用户自己看哪个能连
         try {
+            StringBuilder ips = new StringBuilder();
             java.util.Enumeration<java.net.NetworkInterface> interfaces =
                     java.net.NetworkInterface.getNetworkInterfaces();
             while (interfaces != null && interfaces.hasMoreElements()) {
@@ -493,11 +500,12 @@ private void handleMessage(String message) {
                 java.util.Enumeration<java.net.InetAddress> addresses = intf.getInetAddresses();
                 while (addresses.hasMoreElements()) {
                     java.net.InetAddress addr = addresses.nextElement();
-                    if (addr instanceof java.net.Inet4Address) {
-                        return addr.getHostAddress();
-                    }
+                    if (!(addr instanceof java.net.Inet4Address)) continue;
+                    if (ips.length() > 0) ips.append(" / ");
+                    ips.append(addr.getHostAddress());
                 }
             }
+            if (ips.length() > 0) return ips.toString();
         } catch (Exception e) {
             Log.e(TAG, "获取IP失败", e);
         }

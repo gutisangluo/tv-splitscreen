@@ -22,6 +22,22 @@ public class FileServer extends NanoHTTPD {
 
     private final File mediaDir;
 
+    // 群聊消息环形缓冲区
+    private static final java.util.List<GroupMessage> groupMessages =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
+    private static final int MAX_GROUP_MSGS = 200;
+
+    public static class GroupMessage {
+        public String sender;
+        public String text;
+        public long time;
+        public GroupMessage(String sender, String text, long time) {
+            this.sender = sender;
+            this.text = text;
+            this.time = time;
+        }
+    }
+
     public FileServer(Context context) {
         super(DEFAULT_PORT);
         // 媒体文件存储路径: app 内部存储
@@ -51,6 +67,22 @@ public class FileServer extends NanoHTTPD {
         // POST /upload → 接收文件上传
         if ("/upload".equals(uri) && method == Method.POST) {
             return handleUpload(session);
+        }
+
+        // POST /groupchat/msg → 接收群消息推送
+        if ("/groupchat/msg".equals(uri) && method == Method.POST) {
+            return handleGroupMsgPush(session);
+        }
+
+        // GET /groupchat/msgs → 获取最近消息列表（供 WebView 轮询）
+        if ("/groupchat/msgs".equals(uri) && method == Method.GET) {
+            return handleGroupMsgsQuery(session);
+        }
+
+        // GET /groupchat/clear → 清空消息
+        if ("/groupchat/clear".equals(uri) && method == Method.GET) {
+            groupMessages.clear();
+            return newFixedLengthResponse(Response.Status.OK, "application/json", "{\"ok\":true}");
         }
 
         // GET /media/{filename} → 提供文件
@@ -126,13 +158,19 @@ public class FileServer extends NanoHTTPD {
                 }
             }
 
-            // 生成唯一文件名
+            // 生成唯一文件名（投屏帧固定为 screencast.jpg，覆盖旧帧）
             String ext = "";
             int dotIdx = originalName.lastIndexOf('.');
             if (dotIdx > 0) {
                 ext = originalName.substring(dotIdx).toLowerCase();
             }
-            String uniqueName = System.currentTimeMillis() + "_" + (int)(Math.random() * 10000) + ext;
+            String uniqueName;
+            if (originalName.startsWith("screencast")) {
+                // 投屏帧：固定文件名，覆盖旧帧
+                uniqueName = "screencast" + ext;
+            } else {
+                uniqueName = System.currentTimeMillis() + "_" + (int)(Math.random() * 10000) + ext;
+            }
             File targetFile = new File(mediaDir, uniqueName);
 
             // 从临时文件复制到目标
@@ -232,5 +270,92 @@ public class FileServer extends NanoHTTPD {
      */
     public String getMediaUrl(String fileName) {
         return getLocalUrl() + "/media/" + fileName;
+    }
+
+    // ========= 群聊消息 API =========
+
+    /** POST /groupchat/msg — 接收群消息推送 */
+    private Response handleGroupMsgPush(IHTTPSession session) {
+        try {
+            Map<String, String> files = new java.util.HashMap<>();
+            session.parseBody(files);
+
+            // 读取消息体 JSON
+            String jsonStr = null;
+            for (Map.Entry<String, String> entry : files.entrySet()) {
+                String tmpPath = entry.getValue();
+                if (tmpPath != null && !tmpPath.isEmpty()) {
+                    jsonStr = new String(java.nio.file.Files.readAllBytes(
+                            new java.io.File(tmpPath).toPath()));
+                    break;
+                }
+            }
+            if (jsonStr == null) {
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST,
+                        "application/json", "{\"error\":\"no body\"}");
+            }
+
+            org.json.JSONObject msg = new org.json.JSONObject(jsonStr);
+            String sender = msg.optString("sender", "未知");
+            String text = msg.optString("text", "");
+
+            if (text.isEmpty()) {
+                return newFixedLengthResponse(Response.Status.OK,
+                        "application/json", "{\"ok\":true,\"skipped\":true}");
+            }
+
+            // 加入环形缓冲区
+            groupMessages.add(new GroupMessage(sender, text, System.currentTimeMillis()));
+            while (groupMessages.size() > MAX_GROUP_MSGS) {
+                groupMessages.remove(0);
+            }
+
+            return newFixedLengthResponse(Response.Status.OK,
+                    "application/json", "{\"ok\":true}");
+        } catch (Exception e) {
+            Log.e(TAG, "群消息接收失败", e);
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR,
+                    "application/json", "{\"error\":\"" + e.getMessage() + "\"}");
+        }
+    }
+
+    /** GET /groupchat/msgs — 获取最近消息列表 */
+    private Response handleGroupMsgsQuery(IHTTPSession session) {
+        try {
+            StringBuilder json = new StringBuilder("{\"msgs\":[");
+            boolean first = true;
+            // 取最近 50 条
+            int start = Math.max(0, groupMessages.size() - 50);
+            for (int i = start; i < groupMessages.size(); i++) {
+                GroupMessage m = groupMessages.get(i);
+                if (!first) json.append(",");
+                json.append("{\"sender\":\"")
+                        .append(escapeJson(m.sender))
+                        .append("\",\"text\":\"")
+                        .append(escapeJson(m.text))
+                        .append("\",\"time\":")
+                        .append(m.time)
+                        .append("}");
+                first = false;
+            }
+            json.append("]}");
+
+            Response resp = newFixedLengthResponse(Response.Status.OK,
+                    "application/json", json.toString());
+            addCorsHeaders(resp);
+            return resp;
+        } catch (Exception e) {
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR,
+                    "application/json", "{\"error\":\"" + e.getMessage() + "\"}");
+        }
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 }

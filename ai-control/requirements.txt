@@ -1,0 +1,22 @@
+# TV 分屏 AI 控制端 依赖
+# pip install -r requirements.txt
+
+# GUI 框架
+PyQt5>=5.15.0
+
+# 本地模型推理（GGUF）
+# Windows: pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+llama-cpp-python>=0.2.0
+
+# 微信消息监控（UIAutomation，无 DLL 注入，杀毒不报）
+uiautomation>=2.0.0
+
+# 网络通信
+websocket-client>=1.6.0
+requests>=2.28.0
+
+# 配置
+pyyaml>=6.0
+
+# 图片处理
+Pillow>=10.0.0

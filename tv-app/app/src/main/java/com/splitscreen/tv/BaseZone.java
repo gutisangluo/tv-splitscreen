@@ -65,6 +65,10 @@ public class BaseZone extends FrameLayout {
     // 时钟
     private Handler clockHandler;
 
+    // 投屏
+    private Handler screenCastHandler;
+    private boolean screenCastRunning = false;
+
     public BaseZone(@NonNull Context context) {
         super(context);
         init();
@@ -262,7 +266,7 @@ public class BaseZone extends FrameLayout {
 
     // ========== 幻灯片 ==========
 
-    public void showSlideshow(List<String> urls, int intervalMs) {
+    public void showSlideshow(List<String> urls, int intervalMs, String fit) {
         clearContent();
         contentType = "slideshow";
         this.slideUrls = urls;
@@ -271,7 +275,16 @@ public class BaseZone extends FrameLayout {
         imageView = new ImageView(getContext());
         imageView.setLayoutParams(new LayoutParams(
                 LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
-        imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+
+        ImageView.ScaleType scaleType = ImageView.ScaleType.CENTER_CROP;
+        if (fit != null) {
+            switch (fit) {
+                case "contain": scaleType = ImageView.ScaleType.FIT_CENTER; break;
+                case "fill":    scaleType = ImageView.ScaleType.FIT_XY; break;
+                case "fitW":    scaleType = ImageView.ScaleType.FIT_START; break;
+            }
+        }
+        imageView.setScaleType(scaleType);
 
         if (!urls.isEmpty()) {
             String firstUrl = urls.get(0);
@@ -413,6 +426,105 @@ public class BaseZone extends FrameLayout {
         });
     }
 
+    // ========== 投屏 ==========
+
+    public void showScreenCast(String fit) {
+        clearContent();
+        contentType = "screencast";
+
+        final ImageView iv = new ImageView(getContext());
+        iv.setLayoutParams(new LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+
+        ImageView.ScaleType scaleType = ImageView.ScaleType.FIT_CENTER;
+        if (fit != null) {
+            switch (fit) {
+                case "cover": scaleType = ImageView.ScaleType.CENTER_CROP; break;
+                case "fill":  scaleType = ImageView.ScaleType.FIT_XY; break;
+            }
+        }
+        iv.setScaleType(scaleType);
+        addView(iv);
+
+        // 定时刷新投屏帧（约 3fps），禁用 Glide 缓存
+        screenCastRunning = true;
+        screenCastHandler = new Handler(Looper.getMainLooper());
+        screenCastHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (!screenCastRunning || iv == null) return;
+                String url = "http://127.0.0.1:9528/media/screencast.jpg?t=" + System.currentTimeMillis();
+                Glide.with(getContext())
+                        .load(url)
+                        .skipMemoryCache(true)
+                        .diskCacheStrategy(com.bumptech.glide.load.engine.DiskCacheStrategy.NONE)
+                        .into(iv);
+                screenCastHandler.postDelayed(this, 350);
+            }
+        });
+    }
+
+    // ========== 群聊消息轮播 ==========
+
+    @SuppressLint("SetJavaScriptEnabled")
+    public void showGroupChat() {
+        clearContent();
+        contentType = "groupchat";
+
+        webView = new WebView(getContext());
+        webView.setLayoutParams(new LayoutParams(
+                LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
+        webView.getSettings().setJavaScriptEnabled(true);
+        webView.getSettings().setDomStorageEnabled(true);
+        webView.setBackgroundColor(Color.parseColor("#1a1a2e"));
+
+        String html = "<!DOCTYPE html><html><head><meta charset='utf-8'>" +
+                "<style>" +
+                "body{margin:0;padding:16px;background:#1a1a2e;font-family:sans-serif;overflow:hidden;}" +
+                "#msg{position:absolute;left:16px;right:16px;top:50%;transform:translateY(-50%);" +
+                "background:linear-gradient(135deg,#16213e,#0f3460);border-radius:12px;padding:20px;" +
+                "box-shadow:0 4px 20px rgba(0,0,0,0.4);opacity:0;transition:opacity 0.6s ease;}" +
+                "#sender{font-size:14px;color:#e94560;margin-bottom:8px;font-weight:bold;}" +
+                "#text{font-size:22px;color:#fff;line-height:1.5;word-break:break-all;}" +
+                "#timeid{font-size:11px;color:#555;margin-top:8px;text-align:right;}" +
+                ".empty{color:#555;text-align:center;padding:40px;font-size:16px;}" +
+                "</style></head><body>" +
+                "<div id='msg'><div id='sender'></div><div id='text'></div><div id='timeid'></div></div>" +
+                "<script>" +
+                "var msgs=[],idx=-1,loadIdx=0,loading=false;" +
+                "function showMsg(i){" +
+                "if(i<0||i>=msgs.length)return;" +
+                "var m=msgs[i];" +
+                "document.getElementById('sender').textContent=m.sender;" +
+                "document.getElementById('text').textContent=m.text;" +
+                "var d=new Date(m.time);" +
+                "document.getElementById('timeid').textContent=d.getHours()+':'+String(d.getMinutes()).padStart(2,'0');" +
+                "document.getElementById('msg').style.opacity='1';}" +
+                "function loadMsgs(){" +
+                "if(loading)return;loading=true;" +
+                "var x=new XMLHttpRequest();" +
+                "x.open('GET','http://127.0.0.1:9528/groupchat/msgs?t='+Date.now(),true);" +
+                "x.onload=function(){loading=false;" +
+                "try{var d=JSON.parse(x.responseText);" +
+                "if(d.msgs&&d.msgs.length>0){" +
+                "var oldLen=msgs.length;msgs=d.msgs;" +
+                "if(msgs.length!=oldLen||loadIdx==0){" +
+                "idx=msgs.length-1;showMsg(idx);" +
+                "setTimeout(nextMsg,5000);}" +
+                "}}catch(e){}};" +
+                "x.onerror=function(){loading=false;};" +
+                "x.send();}" +
+                "function nextMsg(){" +
+                "idx=(idx+1)%msgs.length;" +
+                "document.getElementById('msg').style.opacity='0';" +
+                "setTimeout(function(){showMsg(idx);setTimeout(nextMsg,5000);},600);}" +
+                "loadMsgs();setInterval(loadMsgs,8000);" +
+                "</script></body></html>";
+
+        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+        addView(webView);
+    }
+
     // ========== 清空 ==========
 
     public void clear() {
@@ -437,6 +549,12 @@ public class BaseZone extends FrameLayout {
         if (clockHandler != null) {
             clockHandler.removeCallbacksAndMessages(null);
             clockHandler = null;
+        }
+        // 停止投屏刷新
+        screenCastRunning = false;
+        if (screenCastHandler != null) {
+            screenCastHandler.removeCallbacksAndMessages(null);
+            screenCastHandler = null;
         }
 
         // 释放系统 MediaPlayer

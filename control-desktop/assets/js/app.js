@@ -35,6 +35,13 @@
 
     // PING
     pingInterval: null,
+
+    // Screen Cast
+    castStream: null,
+    castVideo: null,
+    castCanvas: null,
+    castTimer: null,
+    casting: false,
   };
 
   // ============================================================
@@ -80,7 +87,7 @@
     video: { apply: 'videoApply', fields: ['videoFile', 'videoLoop', 'videoMute'] },
     web: { apply: 'webApply', fields: ['webUrl', 'webHtml'] },
     text: { apply: 'textApply', fields: ['textContent', 'textSize', 'textAlign', 'textColor', 'textColorHex'] },
-    slideshow: { apply: 'slideApply', fields: ['slideFiles', 'slideInterval'] },
+    slideshow: { apply: 'slideApply', fields: ['slideFiles', 'slideInterval', 'slideFit'] },
   };
 
   // ============================================================
@@ -509,7 +516,7 @@
       var icon = document.createElement('span');
       icon.className = 'zone-type-icon';
       if (z.type) {
-        var iconsMap = { image:'🖼', video:'🎬', web:'🌐', text:'📝', slideshow:'📽' };
+        var iconsMap = { image:'🖼', video:'🎬', web:'🌐', text:'📝', slideshow:'📽', screencast:'📺', groupchat:'💬' };
         icon.textContent = iconsMap[z.type] || '';
       }
       // Don't overlay icon on top of thumbnail
@@ -751,6 +758,7 @@
             hideProgress();
             params.urls = urls;
             params.interval = (parseInt(($('slideInterval') || {}).value, 10) || 5) * 1000;
+            params.fit = ($('slideFit') || {}).value || 'cover';
             sendContentParams(type, zone, params);
             return;
           }
@@ -949,6 +957,97 @@
   }
 
   // ============================================================
+  // SCREEN CAST
+  // ============================================================
+  function startScreenCast(zone) {
+    if (State.casting) return;
+    if (!State.connected) { showToast('请先连接到电视', 'error'); return; }
+
+    try {
+      navigator.mediaDevices.getDisplayMedia({ video: true })
+        .then(function (stream) {
+          State.castStream = stream;
+          State.casting = true;
+
+          // Create hidden video element to capture frames
+          var video = document.createElement('video');
+          State.castVideo = video;
+          video.srcObject = stream;
+          video.play();
+
+          // Create canvas for frame encoding
+          var canvas = document.createElement('canvas');
+          State.castCanvas = canvas;
+          var ctx = canvas.getContext('2d');
+
+          // Update UI
+          $('castStatus').textContent = '📺 正在投屏…';
+          $('castStatus').style.color = '#00FF88';
+          $('castStart').disabled = true;
+          $('castStop').disabled = false;
+
+          // Send screencast content type to TV zone
+          var fit = ($('castFit') || {}).value || 'contain';
+          sendWS({
+            type: 'set_content',
+            content_type: 'screencast',
+            zone_id: zone.id,
+            params: { fit: fit }
+          });
+
+          // Periodic frame capture and upload (3fps)
+          var tvIp = DOM.tvIp.value.trim();
+          var tvPort = DOM.tvPort.value.trim();
+          State.castTimer = setInterval(function () {
+            if (!State.casting || !video.videoWidth) return;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+
+            canvas.toBlob(function (blob) {
+              if (!blob || !State.casting) return;
+              var fd = new FormData();
+              fd.append('screencast.jpg', blob, 'screencast.jpg');
+              // Upload to TV HTTP server (fire and forget)
+              fetch('http://' + tvIp + ':9528/upload', {
+                method: 'POST',
+                body: fd
+              }).catch(function () { /* ignore upload errors */ });
+            }, 'image/jpeg', 65);
+          }, 350);
+
+          // Listen for stream end (user clicks "Stop sharing" in browser)
+          stream.getVideoTracks()[0].addEventListener('ended', function () {
+            stopScreenCast();
+          });
+        })
+        .catch(function (err) {
+          showToast('投屏取消或失败: ' + err.message, 'error');
+        });
+    } catch (e) {
+      showToast('浏览器不支持投屏，请使用桌面端控制', 'error');
+    }
+  }
+
+  function stopScreenCast() {
+    State.casting = false;
+    if (State.castTimer) { clearInterval(State.castTimer); State.castTimer = null; }
+    if (State.castStream) {
+      State.castStream.getTracks().forEach(function (t) { t.stop(); });
+      State.castStream = null;
+    }
+    State.castVideo = null;
+    State.castCanvas = null;
+
+    $('castStatus').textContent = '📺 投屏已停止';
+    $('castStatus').style.color = '';
+    $('castStart').disabled = false;
+    $('castStop').disabled = true;
+
+    showToast('投屏已停止', 'info');
+  }
+
+  // ============================================================
   // INIT
   // ============================================================
   function init() {
@@ -1028,7 +1127,8 @@
         params: {
           text: text,
           direction: $('scrollDirection').value,
-          position: $('scrollPosition').value
+          position: $('scrollPosition').value,
+          fontSize: parseInt($('scrollSize').value, 10) || 16
         }
       });
       showToast('滚动文字已发送', 'success');
@@ -1059,6 +1159,80 @@
         params: { hide: true }
       });
       showToast('时钟已隐藏', 'success');
+    });
+
+    // ---- Screen Cast ----
+    $('castStart').addEventListener('click', function () {
+      var zone = getSelectedZone();
+      if (!zone) { showToast('请先选择一个分区', 'error'); return; }
+      startScreenCast(zone);
+    });
+    $('castStop').addEventListener('click', stopScreenCast);
+
+    // ---- Group Chat ----
+    $('groupChatSend').addEventListener('click', function () {
+      var text = $('groupChatInput').value.trim();
+      if (!text) { showToast('请输入消息内容', 'error'); return; }
+      if (!State.connected) { showToast('请先连接到电视', 'error'); return; }
+
+      var sender = $('groupChatSender').value.trim() || '群友';
+      var tvIp = DOM.tvIp.value.trim();
+      var payload = JSON.stringify({ sender: sender, text: text });
+
+      fetch('http://' + tvIp + ':9528/groupchat/msg', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d.ok) {
+            showToast('消息已发送到电视', 'success');
+            $('groupChatInput').value = '';
+          }
+        })
+        .catch(function (err) {
+          showToast('发送失败: ' + err.message, 'error');
+        });
+    });
+
+    $('groupChatStart').addEventListener('click', function () {
+      var zone = getSelectedZone();
+      if (!zone) { showToast('请先选择一个分区', 'error'); return; }
+      if (!State.connected) { showToast('请先连接到电视', 'error'); return; }
+
+      // 发送 groupchat 内容类型，让电视显示消息轮播
+      sendWS({
+        type: 'set_content',
+        content_type: 'groupchat',
+        zone_id: zone.id,
+        params: {}
+      });
+
+      $('groupChatStatus').textContent = '💬 消息轮播已启动';
+      $('groupChatStatus').style.color = '#00FF88';
+      $('groupChatStart').disabled = true;
+      $('groupChatStop').disabled = false;
+
+      showToast('消息轮播已启动', 'success');
+    });
+    $('groupChatStop').addEventListener('click', function () {
+      var zone = getSelectedZone();
+      if (zone) {
+        sendWS({ type: 'clear_zone', zone_id: zone.id });
+      }
+
+      $('groupChatStatus').textContent = '💬 消息轮播已停止';
+      $('groupChatStatus').style.color = '';
+      $('groupChatStart').disabled = false;
+      $('groupChatStop').disabled = true;
+
+      showToast('消息轮播已停止', 'info');
+    });
+    $('groupChatClear').addEventListener('click', function () {
+      var tvIp = DOM.tvIp.value.trim();
+      fetch('http://' + tvIp + ':9528/groupchat/clear')
+        .then(function () { showToast('消息已清空', 'info'); })
+        .catch(function () { showToast('清空失败', 'error'); });
     });
 
     // Color sync

@@ -1,0 +1,39 @@
+# 电视分屏 AI 控制端 - 默认配置
+# 模型配置
+model:
+  # 模型文件路径（GGUF 格式）
+  # 默认在内置 models/ 目录下找，用户可在 UI 中选择
+  path: "models/qwen2.5-0.5b-instruct-q4_k_m.gguf"
+  # 模型启动参数
+  n_ctx: 2048        # 上下文长度
+  n_threads: 4       # CPU 线程数
+  n_gpu_layers: 0    # GPU 卸载层数（0 = 纯 CPU）
+
+# TV 连接
+tv:
+  host: "192.168.1.100"
+  ws_port: 9527
+  http_port: 9528
+
+# 微信监控
+wechat:
+  # 要监控的微信群名称（支持正则，为空时监控所有群）
+  group_name: ""
+  # 消息时间窗口（秒），仅处理最近 N 秒内的消息
+  time_window: 3600
+
+# 内容分类
+classifier:
+  # 分类间隔（秒），防止频繁切换
+  cooldown: 30
+  # 消息缓冲最大条数
+  max_buffer: 100
+
+# 投屏
+display:
+  # 滚动文字默认速度（毫秒/字）
+  scroll_speed: 300
+  # 幻灯片切换间隔（秒）
+  slideshow_interval: 5
+  # 图片最大尺寸（像素，0=原图）
+  max_image_size: 0

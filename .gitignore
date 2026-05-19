@@ -21,3 +21,9 @@ dist/
 # Temp
 *.log
 *.tmp
+
+# AI Control
+ai-control/venv/
+ai-control/models/*.gguf
+ai-control/*.zip
+ai-control/*.log

@@ -260,13 +260,23 @@ public class ZoneManager {
             case "slideshow":
                 JSONArray urls = params.optJSONArray("urls");
                 int interval = params.optInt("interval", 3000);
+                String slideFit = params.optString("fit", "cover");
                 if (urls != null) {
                     List<String> slideUrls = new ArrayList<>();
                     for (int i = 0; i < urls.length(); i++) {
                         slideUrls.add(urls.optString(i));
                     }
-                    zone.showSlideshow(slideUrls, interval);
+                    zone.showSlideshow(slideUrls, interval, slideFit);
                 }
+                break;
+
+            case "screencast":
+                String castFit = params.optString("fit", "contain");
+                zone.showScreenCast(castFit);
+                break;
+
+            case "groupchat":
+                zone.showGroupChat();
                 break;
 
             case "scroll":
